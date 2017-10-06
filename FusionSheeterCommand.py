@@ -339,12 +339,6 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
         existing_sheet_id_input.isVisible = False
 
-        # parameters_option_input = command_inputs.addButtonRowCommandInput('parameters_option',
-        #                                                                'Parameters to include in new sheet:', False)
-        # parameters_option_input.listItems.add('All Parameters', True, './resources')
-        # parameters_option_input.listItems.add('User Parameters Only', False)
-        # parameters_option_input.isVisible = True
-
         param_title = command_inputs.addTextBoxCommandInput('param_title', '',
                                                             '<b>Parameters to include in new sheet:</b>', 1, True)
         param_title.isVisible = True
@@ -353,6 +347,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         parameters_option_group.listItems.add('All Parameters', True, './resources')
         parameters_option_group.listItems.add('User Parameters Only', False)
         parameters_option_group.isVisible = True
+
 
 class FusionSheeterBuildCommand(Fusion360CommandBase):
     # Run whenever a user makes any change to a value or selection in the addin UI
