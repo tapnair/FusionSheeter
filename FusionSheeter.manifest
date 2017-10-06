@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"91aac5c7-5229-4b77-bcfe-eb836b8101ae",
+	"author":	"Patrick Rainsberry",
+	"description":	{
+		"":	"Fusion 360 + Google Sheets Plugin"
+	},
+	"version":	"1.0",
+	"runOnStartup":	false,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
