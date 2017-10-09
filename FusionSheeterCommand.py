@@ -269,8 +269,7 @@ def update_sheet_bom(sheet_id):
 
     bom_builder(bom_map, root_comp.occurrences, 0)
 
-    app_objects['ui'].messageBox(str(bom_map))
-    # todo recursion - children not accounted for
+    # app_objects['ui'].messageBox(str(bom_map))
 
     bom_to_sheet_values(sheet_values, bom_map)
 
