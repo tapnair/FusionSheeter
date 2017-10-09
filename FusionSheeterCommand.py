@@ -241,7 +241,7 @@ def update_sheet_parameters(sheet_id, all_params):
     range_body = {"range": "Parameters",
                   "values": [headers, dims]}
 
-    request = service.spreadsheets().values().append(spreadsheetId=sheet_id, range='Parameters', body=range_body,
+    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='Parameters', body=range_body,
                                                      valueInputOption='USER_ENTERED')
     response = request.execute()
 
@@ -276,7 +276,7 @@ def update_sheet_bom(sheet_id):
     range_body = {"range": "BOM",
                   "values": sheet_values}
 
-    request = service.spreadsheets().values().append(spreadsheetId=sheet_id, range='BOM', body=range_body,
+    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='BOM', body=range_body,
                                                      valueInputOption='USER_ENTERED')
     response = request.execute()
 
@@ -336,6 +336,8 @@ def update_meta(items):
             component.description = item['Description']
             change_list += ('Changed: ' + component.name + ' Description to: ' + item['Description'] + '\n')
 
+    if len(change_list) == 0:
+        change_list += 'No Metadata changes were found'
     ui.messageBox(change_list)
 
 
@@ -435,7 +437,14 @@ class FusionSheeterParameterPullCommand(Fusion360CommandBase):
         items = get_sheet_data('Parameters', sheet_id)
         update_parameters(items[row_id])
 
+class FusionSheeterParameterPushCommand(Fusion360CommandBase):
 
+    def on_execute(self, command, inputs, args, input_values):
+
+        sheet_id = get_sheet_id()
+        row_id = get_row_id()
+        items = get_sheet_data('Parameters', sheet_id)
+        update_parameters(items[row_id])
 
 
 class FusionSheeterCreateCommand(Fusion360CommandBase):

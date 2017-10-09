@@ -72,18 +72,18 @@ cmd = {
 }
 command_definitions.append(cmd)
 
-# # Define parameters for 1st command
-# cmd = {
-#     'cmd_name': 'Push BOM Data',
-#     'cmd_description': 'Update Google Sheets Document with Fusion 360 Component Meta-Data',
-#     'cmd_id': 'cmdID_FusionSheeterBOMPushCommand',
-#     'cmd_resources': './resources',
-#     'workspace': 'FusionSolidEnvironment',
-#     'toolbar_panel_id': 'Sheeter',
-#     'command_promoted': False,
-#     'class': FusionSheeterBOMPushCommand
-# }
-# command_definitions.append(cmd)
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Push BOM Data',
+    'cmd_description': 'Update Google Sheets Document with Fusion 360 Component Meta-Data',
+    'cmd_id': 'cmdID_FusionSheeterBOMPushCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_promoted': False,
+    'class': FusionSheeterBOMPushCommand
+}
+command_definitions.append(cmd)
 
 # Define parameters for 1st command
 cmd = {
