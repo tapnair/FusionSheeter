@@ -8,26 +8,27 @@ command_definitions = []
 
 # Define parameters for 1st command
 cmd = {
-    'cmd_name': 'Change Size',
-    'cmd_description': 'Fusionto Google Sheets Connector',
-    'cmd_id': 'cmdID_FusionSheeterCommand',
-    'cmd_resources': './resources',
-    'workspace': 'FusionSolidEnvironment',
-    'toolbar_panel_id': 'Sheeter',
-    'class': FusionSheeterCommand
-}
-command_definitions.append(cmd)
-
-# Define parameters for 1st command
-cmd = {
     'cmd_name': 'Link Design to Google Sheet',
-    'cmd_description': 'Fusion to Google Sheets Creator',
+    'cmd_description': 'Creates a new Google Sheets Document in your Google Drive based on the current active model.  '
+                       'Establishes a link from the current design to the new spreadsheet.',
     'cmd_id': 'cmdID_FusionSheeterCreateCommand',
     'cmd_resources': './resources',
     'workspace': 'FusionSolidEnvironment',
     'toolbar_panel_id': 'Sheeter',
     'command_promoted': True,
     'class': FusionSheeterCreateCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Change Size',
+    'cmd_description': 'Change association of active model to a different row in Sheets Document',
+    'cmd_id': 'cmdID_FusionSheeterCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'class': FusionSheeterCommand
 }
 command_definitions.append(cmd)
 
