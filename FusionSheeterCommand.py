@@ -10,6 +10,8 @@ import sys
 import csv
 import webbrowser
 
+from collections import defaultdict, namedtuple
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
 
 import httplib2
@@ -18,6 +20,8 @@ from apiclient import discovery
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
+
+BOM_Item = namedtuple('BOM_Item', ('part_number', 'part_name', 'description', 'children', 'level'))
 
 try:
     import argparse
@@ -73,9 +77,8 @@ def get_sheets_service():
     return service
 
 
-def get_sheet_data():
+def get_sheet_id():
     app_objects = get_app_objects()
-    um = app_objects['units_manager']
     ui = app_objects['ui']
     design = app_objects['design']
 
@@ -88,17 +91,36 @@ def get_sheet_data():
                       'Use the link button first to establish a linked sheet')
         return False
 
-    service = get_sheets_service()
+    return spreadsheet_id
 
-    # range_name = 'Sizes'
-    range_name = 'Sheet1'
+
+def get_row_id():
+    app_objects = get_app_objects()
+    ui = app_objects['ui']
+    design = app_objects['design']
+
+    row_id_attribute = design.attributes.itemByName('FusionSheeter', 'parameter_row_index')
+
+    if row_id_attribute:
+        row_id = row_id_attribute.value
+    else:
+        return 0
+
+    return int(row_id)
+
+
+def get_sheet_data(range_name, spreadsheet_id):
+
+    app_objects = get_app_objects()
+    ui = app_objects['ui']
+
+    service = get_sheets_service()
 
     result = service.spreadsheets().values().get(
         spreadsheetId=spreadsheet_id, range=range_name).execute()
 
     if not result:
         ui.messageBox('Could not connect to Sheet.  Try again or make sure you have the correct Sheet ID')
-        return False
 
     rows = result.get('values', [])
 
@@ -108,15 +130,14 @@ def get_sheet_data():
         row_dict = dict(zip(rows[0], row))
         dict_list.append(row_dict)
 
-    # ao = get_app_objects()
-    # ao['ui'].messageBox(str(rows))
-
     return dict_list
 
 
 def update_parameters(size):
+
     app_objects = get_app_objects()
     um = app_objects['units_manager']
+
     # root_comp = app_objects['root_comp']
 
     # model_parameters = root_comp.modelParameters
@@ -149,19 +170,32 @@ def update_parameters(size):
         design.rootComponent.description = new_description
 
 
-def create_sheet(all_params):
-    app_objects = get_app_objects()
-    um = app_objects['units_manager']
-    design = app_objects['design']
-
-    name = app_objects['app'].activeDocument.name
-
-    name = name[:name.rfind(' v')]
+def create_sheet(name):
 
     spreadsheet_body = {
         "properties": {
             "title": name
-        }
+        },
+        'sheets': [
+            {
+                "properties": {
+                    "title": 'Parameters',
+                    'gridProperties': {
+                        "frozenRowCount": 1
+                    }
+                }
+
+            },
+            {
+                "properties": {
+                    "title": 'BOM',
+                    'gridProperties': {
+                        "columnCount": 4,
+                        "frozenRowCount": 1
+                    }
+                }
+            }
+        ]
     }
 
     service = get_sheets_service()
@@ -172,6 +206,16 @@ def create_sheet(all_params):
     # app_objects['ui'].messageBox(str(response['spreadsheetId']))
 
     new_id = response['spreadsheetId']
+
+    return new_id
+
+
+def update_sheet_parameters(sheet_id, all_params):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+    design = app_objects['design']
+
+    service = get_sheets_service()
 
     if all_params:
         parameters = design.allParameters
@@ -194,14 +238,106 @@ def create_sheet(all_params):
         headers.append(parameter.name)
         dims.append(um.formatInternalValue(parameter.value, "DefaultDistance", False))
 
-    range_body = {"range": "Sheet1",
+    range_body = {"range": "Parameters",
                   "values": [headers, dims]}
 
-    request = service.spreadsheets().values().append(spreadsheetId=new_id, range='Sheet1', body=range_body,
+    request = service.spreadsheets().values().append(spreadsheetId=sheet_id, range='Parameters', body=range_body,
                                                      valueInputOption='USER_ENTERED')
     response = request.execute()
 
-    return new_id
+
+def update_sheet_bom(sheet_id):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+    design = app_objects['design']
+
+    service = get_sheets_service()
+
+    headers = []
+    sheet_values = []
+
+    headers.append('Part Name')
+    headers.append('Description')
+    headers.append('Part Number')
+    headers.append('Quantity')
+    headers.append('Level')
+
+    sheet_values.append(headers)
+
+    bom_map = defaultdict(list)
+    root_comp = app_objects['root_comp']
+
+    bom_builder(bom_map, root_comp.occurrences, 0)
+
+    app_objects['ui'].messageBox(str(bom_map))
+    # todo recursion - children not accounted for
+
+    bom_to_sheet_values(sheet_values, bom_map)
+
+    range_body = {"range": "BOM",
+                  "values": sheet_values}
+
+    request = service.spreadsheets().values().append(spreadsheetId=sheet_id, range='BOM', body=range_body,
+                                                     valueInputOption='USER_ENTERED')
+    response = request.execute()
+
+
+def bom_to_sheet_values(sheet_values, bom_map):
+
+    for component, occurrences in bom_map.items():
+
+        bom_item = occurrences[0]
+        sheet_values.append(
+            [
+                bom_item.part_name,
+                bom_item.description,
+                bom_item.part_number,
+                str(len(occurrences)),
+                bom_item.level
+            ]
+
+        )
+
+        if len(bom_item.children) > 0:
+            bom_to_sheet_values(sheet_values, bom_item.children)
+
+
+def bom_builder(bom_map, occurrences, level):
+
+    for occurrence in occurrences:
+
+        new_item = BOM_Item(part_number=occurrence.component.partNumber, part_name=occurrence.component.name,
+                            description=occurrence.component.description, children=defaultdict(list), level=level)
+
+        bom_map[new_item.part_name].append(new_item)
+
+        child_occurrences = occurrence.childOccurrences
+
+        if child_occurrences.count > 0:
+            bom_builder(new_item.children, child_occurrences, level+1)
+
+
+def update_meta(items):
+
+    app_objects = get_app_objects()
+    design = app_objects['design']
+    ui = app_objects['ui']
+
+    change_list = ''
+
+    all_components = design.allComponents
+
+    for item in items:
+        component = all_components.itemByName(item['Part Name'])
+        if component.partNumber != item['Part Number']:
+            component.partNumber = item['Part Number']
+            change_list += ('Changed: ' + component.name + ' Part Number to: ' + item['Part Number'] + '\n')
+
+        if component.description != item['Description']:
+            component.description = item['Description']
+            change_list += ('Changed: ' + component.name + ' Description to: ' + item['Description'] + '\n')
+
+    ui.messageBox(change_list)
 
 
 # Class for a Fusion 360 Command
@@ -212,10 +348,15 @@ class FusionSheeterCommand(Fusion360CommandBase):
     # Commands in here will be run through the Fusion processor and changes will be reflected in  Fusion graphics area
     def on_preview(self, command, inputs, args, input_values):
 
+        app_objects = get_app_objects()
+        design = app_objects['design']
+
         # TODO add a 'current values' to top of list
         index = input_values['Size_input'].selectedItem.index
 
-        sizes = get_sheet_data()
+        sheet_id = get_sheet_id()
+
+        sizes = get_sheet_data('Parameters', sheet_id)
 
         if not sizes:
             return
@@ -225,7 +366,9 @@ class FusionSheeterCommand(Fusion360CommandBase):
         # ao = get_app_objects()
         # ao['ui'].messageBox(str(size))
 
+        # Todo handle cancel to revert value??
         update_parameters(size)
+        design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
         args.isValidResult = True
 
     # Run after the command is finished.
@@ -247,7 +390,10 @@ class FusionSheeterCommand(Fusion360CommandBase):
     # Typically used to create and display a command dialog box
     # The following is a basic sample of a dialog UI
     def on_create(self, command, command_inputs):
-        sizes = get_sheet_data()
+
+        sheet_id = get_sheet_id()
+
+        sizes = get_sheet_data('Parameters', sheet_id)
 
         size_drop_down = command_inputs.addDropDownCommandInput('Size', 'Which Size?',
                                                                 adsk.core.DropDownStyles.LabeledIconDropDownStyle)
@@ -256,7 +402,41 @@ class FusionSheeterCommand(Fusion360CommandBase):
 
         for size in sizes:
             size_drop_down.listItems.add(size['Description'], False)
-        size_drop_down.listItems.item(0).isSelected = True
+
+        row_id = get_row_id()
+
+        size_drop_down.listItems.item(row_id).isSelected = True
+
+
+class FusionSheeterBOMPullCommand(Fusion360CommandBase):
+
+    def on_execute(self, command, inputs, args, input_values):
+        sheet_id = get_sheet_id()
+        items = get_sheet_data('BOM', sheet_id)
+        update_meta(items)
+
+
+# This needs a lot of thought and work
+# Todo not working as you'd think
+class FusionSheeterBOMPushCommand(Fusion360CommandBase):
+
+    def on_execute(self, command, inputs, args, input_values):
+
+        sheet_id = get_sheet_id()
+
+        update_sheet_bom(sheet_id)
+
+
+class FusionSheeterParameterPullCommand(Fusion360CommandBase):
+
+    def on_execute(self, command, inputs, args, input_values):
+
+        sheet_id = get_sheet_id()
+        row_id = get_row_id()
+        items = get_sheet_data('Parameters', sheet_id)
+        update_parameters(items[row_id])
+
+
 
 
 class FusionSheeterCreateCommand(Fusion360CommandBase):
@@ -302,8 +482,13 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         if input_values['parameters_option'] == 'User Parameters Only':
             all_params = False
 
+        name = app_objects['app'].activeDocument.name
+        name = name[:name.rfind(' v')]
+
         if input_values['new_or_existing'] == 'Create New Sheet':
-            new_id = create_sheet(all_params)
+            new_id = create_sheet(name)
+            update_sheet_parameters(new_id, all_params)
+            update_sheet_bom(new_id)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']
@@ -315,6 +500,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             return
 
         design.attributes.add('FusionSheeter', 'spreadsheetId', new_id)
+        design.attributes.add('FusionSheeter', 'parameter_row_index', '0')
 
         url = 'https://docs.google.com/spreadsheets/d/%s/edit#gid=0' % new_id
 
@@ -342,7 +528,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
                             'existing sheets document. \n\n ' \
                             'This is found by examining the hyperlink displayed in your ' \
                             'browser when editing the document: \n\n' \
-                            '     https://docs.google.com/spreadsheets/d/****spreadshetID*****/edit#gid=0 \n\n'\
+                            '     https://docs.google.com/spreadsheets/d/****spreadshetID*****/edit#gid=0 \n\n' \
                             'Copy just the long character string between d/ and /edit.\n\n\n'
 
         instructions_input = command_inputs.addTextBoxCommandInput('instructions', '',
@@ -389,8 +575,35 @@ class FusionSheeterBuildCommand(Fusion360CommandBase):
     # Run when the user presses OK
     # This is typically where your main program logic would go
     def on_execute(self, command, inputs, args, input_values):
-        pass
-        # TODO export all sizes to folder
+
+        app_objects = get_app_objects()
+        document = app_objects['document']
+        ui = app_objects['ui']
+        design = app_objects['design']
+
+        if not document.isSaved:
+            ui.messageBox('Please save document first')
+            return
+
+        folder = document.dataFile.parentFolder
+
+        document.save('Auto Saved by Fusion Sheeter')
+
+        sheet_id = get_sheet_id()
+
+        sizes = get_sheet_data('Parameters', sheet_id)
+
+        for index, size in enumerate(sizes):
+
+            app_objects = get_app_objects()
+            document = app_objects['document']
+            ui = app_objects['ui']
+            design = app_objects['design']
+
+            update_parameters(size)
+            design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+
+            document.saveAs(size['Description'], folder, 'Auto Generated by Fusion Sheeter', '')
 
     # Run when the user selects your command icon from the Fusion 360 UI
     # Typically used to create and display a command dialog box
