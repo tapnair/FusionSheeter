@@ -8,6 +8,7 @@ from .Fusion360Utilities.Fusion360CommandBase import Fusion360CommandBase
 import os
 import sys
 import csv
+import webbrowser
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
 
@@ -75,7 +76,7 @@ def get_sheets_service():
 def get_sheet_data():
     app_objects = get_app_objects()
     um = app_objects['units_manager']
-    ui = app_objects['units_manager']
+    ui = app_objects['ui']
     design = app_objects['design']
 
     spreadsheet_id_attribute = design.attributes.itemByName('FusionSheeter', 'spreadsheetId')
@@ -120,22 +121,32 @@ def update_parameters(size):
 
     # model_parameters = root_comp.modelParameters
 
-    # # TODO iterate all components
+    # # TODO iterate all components and also create / deal with BOM info
     # for parameter in model_parameters:
     #
     #     new_value = size.get(parameter.name)
     #     if new_value is not None:
     #         parameter.value = um.evaluateExpression(new_value, 'in')
 
-    all_parameters = app_objects['design'].allParameters
+    design = app_objects['design']
+
+    all_parameters = design.allParameters
 
     for parameter in all_parameters:
 
         new_value = size.get(parameter.name)
         if new_value is not None:
-            # TODO handle units
-            if parameter.value != um.evaluateExpression(new_value, 'in'):
-                parameter.value = um.evaluateExpression(new_value, 'in')
+            # TODO handle units with an attribute that is written on create.  Can be set for link
+            if parameter.value != um.evaluateExpression(new_value, um.defaultLengthUnits):
+                parameter.value = um.evaluateExpression(new_value, um.defaultLengthUnits)
+
+    new_number = size.get('Part Number')
+    if new_number is not None:
+        design.rootComponent.partNumber = new_number
+
+    new_description = size.get('Description')
+    if new_description is not None:
+        design.rootComponent.description = new_description
 
 
 def create_sheet(all_params):
@@ -144,6 +155,9 @@ def create_sheet(all_params):
     design = app_objects['design']
 
     name = app_objects['app'].activeDocument.name
+
+    name = name[:name.rfind(' v')]
+
     spreadsheet_body = {
         "properties": {
             "title": name
@@ -155,7 +169,7 @@ def create_sheet(all_params):
     request = service.spreadsheets().create(body=spreadsheet_body)
     response = request.execute()
 
-    app_objects['ui'].messageBox(str(response['spreadsheetId']))
+    # app_objects['ui'].messageBox(str(response['spreadsheetId']))
 
     new_id = response['spreadsheetId']
 
@@ -167,13 +181,13 @@ def create_sheet(all_params):
     headers = []
     dims = []
 
-    headers.append('name')
-    dims.append(design.rootComponent.name)
+    # headers.append('name')
+    # dims.append(design.rootComponent.name)
 
-    headers.append('number')
+    headers.append('Part Number')
     dims.append(design.rootComponent.partNumber)
 
-    headers.append('description')
+    headers.append('Description')
     dims.append(design.rootComponent.description)
 
     for parameter in parameters:
@@ -237,10 +251,11 @@ class FusionSheeterCommand(Fusion360CommandBase):
 
         size_drop_down = command_inputs.addDropDownCommandInput('Size', 'Which Size?',
                                                                 adsk.core.DropDownStyles.LabeledIconDropDownStyle)
-        ao = get_app_objects()
-        ao['ui'].messageBox(str(sizes))
+        # ao = get_app_objects()
+        # ao['ui'].messageBox(str(sizes))
+
         for size in sizes:
-            size_drop_down.listItems.add(size['description'], False)
+            size_drop_down.listItems.add(size['Description'], False)
         size_drop_down.listItems.item(0).isSelected = True
 
 
@@ -301,6 +316,10 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
         design.attributes.add('FusionSheeter', 'spreadsheetId', new_id)
 
+        url = 'https://docs.google.com/spreadsheets/d/%s/edit#gid=0' % new_id
+
+        webbrowser.open(url, new=2)
+
     # Run when the user selects your command icon from the Fusion 360 UI
     # Typically used to create and display a command dialog box
     # The following is a basic sample of a dialog UI
@@ -310,6 +329,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         #                                                       'Create New Sheet or Link to existing?', False)
         # new_or_existing_input.listItems.add('Create New Sheet', True)
         # new_or_existing_input.listItems.add('Link to Existing Sheet', False)
+
+        command.setDialogInitialSize(600, 800)
 
         command_inputs.addTextBoxCommandInput('new_title', '', '<b>Create New Sheet or Link to existing?</b>', 1, True)
         new_option_group = command_inputs.addRadioButtonGroupCommandInput('new_or_existing')
