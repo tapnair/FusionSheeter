@@ -609,3 +609,10 @@ class FusionSheeterBuildCommand(Fusion360CommandBase):
     # The following is a basic sample of a dialog UI
     def on_create(self, command, command_inputs):
         pass
+
+class FusionSheeterOpenSheetCommand(Fusion360CommandBase):
+    def on_execute(self, command, inputs, args, input_values):
+        sheet_id = get_sheet_id()
+        url = 'https://docs.google.com/spreadsheets/d/%s/edit#gid=0' % sheet_id
+
+        webbrowser.open(url, new=2)

@@ -1,7 +1,8 @@
 # Importing sample Fusion Command
 # Could import multiple Command definitions here
 from .FusionSheeterCommand import FusionSheeterCommand, FusionSheeterCreateCommand,FusionSheeterBOMPullCommand, \
-    FusionSheeterBOMPushCommand, FusionSheeterParameterPullCommand, FusionSheeterBuildCommand
+    FusionSheeterBOMPushCommand, FusionSheeterParameterPullCommand, FusionSheeterBuildCommand, \
+    FusionSheeterOpenSheetCommand
 
 commands = []
 command_definitions = []
@@ -17,6 +18,19 @@ cmd = {
     'toolbar_panel_id': 'Sheeter',
     'command_promoted': True,
     'class': FusionSheeterCreateCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Open Sheet',
+    'cmd_description': 'Open Sheet Associated with this Fusion 360 Design',
+    'cmd_id': 'cmdID_FusionSheeterOpenSheetCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_promoted': False,
+    'class': FusionSheeterOpenSheetCommand
 }
 command_definitions.append(cmd)
 
