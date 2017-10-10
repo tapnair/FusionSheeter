@@ -12,6 +12,7 @@ import webbrowser
 
 from collections import defaultdict, namedtuple
 
+# Todo add and remove ass necessary only when making the call
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
 
 import httplib2
@@ -133,6 +134,30 @@ def get_sheet_data(range_name, spreadsheet_id):
     return dict_list
 
 
+def get_feature_sheet_data(range_name, spreadsheet_id):
+
+    app_objects = get_app_objects()
+    ui = app_objects['ui']
+
+    service = get_sheets_service()
+
+    result = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=range_name).execute()
+
+    if not result:
+        ui.messageBox('Could not connect to Sheet.  Try again or make sure you have the correct Sheet ID')
+
+    rows = result.get('values', [])
+
+    list_of_lists = []
+
+    for row in rows[1:]:
+        row_list = zip(rows[0], row)
+        list_of_lists.append(row_list)
+
+    return list_of_lists
+
+
 def update_parameters(size):
 
     app_objects = get_app_objects()
@@ -170,6 +195,51 @@ def update_parameters(size):
         design.rootComponent.description = new_description
 
 
+def update_features(feature_list):
+
+    app_objects = get_app_objects()
+    design = app_objects['design']
+    ui = app_objects['ui']
+
+    # ui.messageBox(str(feature_list))
+
+    # Record feature suppression state
+    time_line = design.timeline
+
+    for index in range(time_line.count):
+
+        time_line_object = time_line.item(index)
+
+        new_state = get_tuple(feature_list, time_line_object.name)
+
+        if new_state is not None:
+
+            if new_state[1] == 'Unsuppressed' and time_line_object.isSuppressed:
+                time_line_object.isSuppressed = False
+
+            elif new_state[1] == 'Suppressed' and not time_line_object.isSuppressed:
+                time_line_object.isSuppressed = True
+
+    new_number = get_tuple(feature_list, 'Part Number')
+    if new_number is not None:
+        design.rootComponent.partNumber = new_number[1]
+
+    new_description = get_tuple(feature_list, 'Description')
+    if new_description is not None:
+        design.rootComponent.description = new_description[1]
+
+
+def get_tuple(feature_list, name):
+
+    for index, feature in enumerate(feature_list):
+
+        if feature[0] == name:
+            return feature_list.pop(index)
+
+    return None
+
+
+
 def create_sheet(name):
 
     spreadsheet_body = {
@@ -191,6 +261,14 @@ def create_sheet(name):
                     "title": 'BOM',
                     'gridProperties': {
                         "columnCount": 4,
+                        "frozenRowCount": 1
+                    }
+                }
+            },
+            {
+                "properties": {
+                    "title": 'Features',
+                    'gridProperties': {
                         "frozenRowCount": 1
                     }
                 }
@@ -242,6 +320,53 @@ def update_sheet_parameters(sheet_id, all_params):
                   "values": [headers, dims]}
 
     request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='Parameters', body=range_body,
+                                                     valueInputOption='USER_ENTERED')
+    response = request.execute()
+
+
+def update_sheet_suppression(sheet_id, all_features):
+
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+    design = app_objects['design']
+    ui = app_objects['ui']
+
+    service = get_sheets_service()
+
+
+    headers = []
+    dims = []
+
+    headers.append('Part Number')
+    dims.append(design.rootComponent.partNumber)
+
+    headers.append('Description')
+    dims.append(design.rootComponent.description)
+
+    # Record feature suppression state
+    time_line = design.timeline
+
+    for index in range(time_line.count):
+
+        time_line_object = time_line.item(index)
+
+        if time_line_object.isGroup:
+            state = 'Group'
+        elif time_line_object.isSuppressed:
+            state = 'Suppressed'
+        else:
+            state = 'Unsuppressed'
+
+        # ui.messageBox(time_line_object.entity.objectType)
+        feature_name = time_line_object.name
+        # feature_name = time_line_object.entity.parentComponent.name + ':' + time_line_object.name
+        headers.append(feature_name)
+        dims.append(state)
+
+    range_body = {"range": "Features",
+                  "values": [headers, dims]}
+
+    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='Features', body=range_body,
                                                      valueInputOption='USER_ENTERED')
     response = request.execute()
 
@@ -418,7 +543,7 @@ class FusionSheeterBOMPullCommand(Fusion360CommandBase):
 
 
 # This needs a lot of thought and work
-# Todo not working as you'd think
+# Todo notify that it will overwrite any un-consumed changes in the sheet
 class FusionSheeterBOMPushCommand(Fusion360CommandBase):
 
     def on_execute(self, command, inputs, args, input_values):
@@ -437,6 +562,17 @@ class FusionSheeterParameterPullCommand(Fusion360CommandBase):
         items = get_sheet_data('Parameters', sheet_id)
         update_parameters(items[row_id])
 
+
+class FusionSheeterFeaturePullCommand(Fusion360CommandBase):
+    def on_execute(self, command, inputs, args, input_values):
+        sheet_id = get_sheet_id()
+        row_id = get_row_id()
+
+        feature_list_of_lists = get_feature_sheet_data('Features', sheet_id)
+        update_features(feature_list_of_lists[row_id])
+
+
+# Todo - Does nothing still
 class FusionSheeterParameterPushCommand(Fusion360CommandBase):
 
     def on_execute(self, command, inputs, args, input_values):
@@ -497,6 +633,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             new_id = create_sheet(name)
             update_sheet_parameters(new_id, all_params)
             update_sheet_bom(new_id)
+            # Todo optional only renamed features?
+            update_sheet_suppression(new_id, True)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']

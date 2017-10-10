@@ -2,7 +2,7 @@
 # Could import multiple Command definitions here
 from .FusionSheeterCommand import FusionSheeterCommand, FusionSheeterCreateCommand,FusionSheeterBOMPullCommand, \
     FusionSheeterBOMPushCommand, FusionSheeterParameterPullCommand, FusionSheeterBuildCommand, \
-    FusionSheeterOpenSheetCommand
+    FusionSheeterOpenSheetCommand, FusionSheeterFeaturePullCommand
 
 commands = []
 command_definitions = []
@@ -69,6 +69,19 @@ cmd = {
     'toolbar_panel_id': 'Sheeter',
     'command_promoted': False,
     'class': FusionSheeterParameterPullCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Pull Feature Data',
+    'cmd_description': 'Update Fusion 360 Feature Suppression from Google Sheets',
+    'cmd_id': 'cmdID_FusionSheeterFeaturePullCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_promoted': False,
+    'class': FusionSheeterFeaturePullCommand
 }
 command_definitions.append(cmd)
 
