@@ -1,6 +1,6 @@
 # Importing sample Fusion Command
 # Could import multiple Command definitions here
-from .FusionSheeterCommand import FusionSheeterCommand, FusionSheeterCreateCommand,FusionSheeterBOMPullCommand, \
+from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand,FusionSheeterBOMPullCommand, \
     FusionSheeterBOMPushCommand, FusionSheeterParameterPullCommand, FusionSheeterBuildCommand, \
     FusionSheeterOpenSheetCommand, FusionSheeterFeaturePullCommand
 
@@ -42,7 +42,7 @@ cmd = {
     'cmd_resources': './resources',
     'workspace': 'FusionSolidEnvironment',
     'toolbar_panel_id': 'Sheeter',
-    'class': FusionSheeterCommand
+    'class': FusionSheeterSizeCommand
 }
 command_definitions.append(cmd)
 

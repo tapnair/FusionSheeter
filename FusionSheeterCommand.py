@@ -152,7 +152,7 @@ def get_feature_sheet_data(range_name, spreadsheet_id):
     list_of_lists = []
 
     for row in rows[1:]:
-        row_list = zip(rows[0], row)
+        row_list = list(zip(rows[0], row))
         list_of_lists.append(row_list)
 
     return list_of_lists
@@ -206,8 +206,8 @@ def update_features(feature_list):
     # Record feature suppression state
     time_line = design.timeline
 
-    for index in range(time_line.count):
-
+    for index in reversed(range(time_line.count)):
+        # ui.messageBox('timeline index: ' + str(index))
         time_line_object = time_line.item(index)
 
         new_state = get_tuple(feature_list, time_line_object.name)
@@ -230,10 +230,14 @@ def update_features(feature_list):
 
 
 def get_tuple(feature_list, name):
+    app_objects = get_app_objects()
+    ui = app_objects['ui']
+    feature_list = list(reversed(feature_list))
 
     for index, feature in enumerate(feature_list):
-
+        # ui.messageBox('tuple index: ' + str(index))
         if feature[0] == name:
+            # ui.messageBox('feature: ' + str(feature_list[index]))
             return feature_list.pop(index)
 
     return None
@@ -469,7 +473,7 @@ def update_meta(items):
 # Class for a Fusion 360 Command
 # Place your program logic here
 # Delete the line that says "pass" for any method you want to use
-class FusionSheeterCommand(Fusion360CommandBase):
+class FusionSheeterSizeCommand(Fusion360CommandBase):
     # Run whenever a user makes any change to a value or selection in the addin UI
     # Commands in here will be run through the Fusion processor and changes will be reflected in  Fusion graphics area
     def on_preview(self, command, inputs, args, input_values):
@@ -483,18 +487,13 @@ class FusionSheeterCommand(Fusion360CommandBase):
         sheet_id = get_sheet_id()
 
         sizes = get_sheet_data('Parameters', sheet_id)
+        update_parameters(sizes[index])
 
-        if not sizes:
-            return
+        feature_list_of_lists = get_feature_sheet_data('Features', sheet_id)
+        update_features(feature_list_of_lists[index])
 
-        size = sizes[index]
-
-        # ao = get_app_objects()
-        # ao['ui'].messageBox(str(size))
-
-        # Todo handle cancel to revert value??
-        update_parameters(size)
         design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+
         args.isValidResult = True
 
     # Run after the command is finished.
