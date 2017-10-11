@@ -384,6 +384,7 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
             self.cmd_object_.on_execute(command_, command_inputs, args, input_values)
 
         except:
+            print('The error: {}'.format(traceback.format_exc()))
             if ui:
                 ui.messageBox('command executed failed: {}'.format(traceback.format_exc()))
 

@@ -1,11 +1,25 @@
 # Importing sample Fusion Command
 # Could import multiple Command definitions here
-from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand,FusionSheeterBOMPullCommand, \
-    FusionSheeterBOMPushCommand, FusionSheeterParameterPullCommand, FusionSheeterBuildCommand, \
-    FusionSheeterOpenSheetCommand, FusionSheeterFeaturePullCommand
+from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
+     FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand,\
+     FusionSheeterFeaturePullCommand, FusionSheeterBOMPullCommand, FusionSheeterBOMPushCommand, \
+    FusionSheeterParameterPullCommand
 
 commands = []
 command_definitions = []
+
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Sync With Google Sheet',
+    'cmd_description': 'Synchronize Design Parameters, BOM Data and Feature Suppression with a Google Sheet',
+    'cmd_id': 'cmdID_FusionSheeterSyncCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_promoted': True,
+    'class': FusionSheeterSyncCommand
+}
+command_definitions.append(cmd)
 
 # Define parameters for 1st command
 cmd = {
@@ -16,7 +30,7 @@ cmd = {
     'cmd_resources': './resources',
     'workspace': 'FusionSolidEnvironment',
     'toolbar_panel_id': 'Sheeter',
-    'command_promoted': True,
+    'command_promoted': False,
     'class': FusionSheeterCreateCommand
 }
 command_definitions.append(cmd)
@@ -46,57 +60,57 @@ cmd = {
 }
 command_definitions.append(cmd)
 
-# Define parameters for 1st command
-cmd = {
-    'cmd_name': 'Pull BOM Data',
-    'cmd_description': 'Update Fusion 360 Component Meta-Data from Google Sheets',
-    'cmd_id': 'cmdID_FusionSheeterBOMPullCommand',
-    'cmd_resources': './resources',
-    'workspace': 'FusionSolidEnvironment',
-    'toolbar_panel_id': 'Sheeter',
-    'command_promoted': False,
-    'class': FusionSheeterBOMPullCommand
-}
-command_definitions.append(cmd)
-
-# Define parameters for 1st command
-cmd = {
-    'cmd_name': 'Pull Parameter Data',
-    'cmd_description': 'Update Fusion 360 Component Parameters from Google Sheets',
-    'cmd_id': 'cmdID_FusionSheeterParametersPullCommand',
-    'cmd_resources': './resources',
-    'workspace': 'FusionSolidEnvironment',
-    'toolbar_panel_id': 'Sheeter',
-    'command_promoted': False,
-    'class': FusionSheeterParameterPullCommand
-}
-command_definitions.append(cmd)
-
-# Define parameters for 1st command
-cmd = {
-    'cmd_name': 'Pull Feature Data',
-    'cmd_description': 'Update Fusion 360 Feature Suppression from Google Sheets',
-    'cmd_id': 'cmdID_FusionSheeterFeaturePullCommand',
-    'cmd_resources': './resources',
-    'workspace': 'FusionSolidEnvironment',
-    'toolbar_panel_id': 'Sheeter',
-    'command_promoted': False,
-    'class': FusionSheeterFeaturePullCommand
-}
-command_definitions.append(cmd)
-
-# Define parameters for 1st command
-cmd = {
-    'cmd_name': 'Push BOM Data',
-    'cmd_description': 'Update Google Sheets Document with Fusion 360 Component Meta-Data',
-    'cmd_id': 'cmdID_FusionSheeterBOMPushCommand',
-    'cmd_resources': './resources',
-    'workspace': 'FusionSolidEnvironment',
-    'toolbar_panel_id': 'Sheeter',
-    'command_promoted': False,
-    'class': FusionSheeterBOMPushCommand
-}
-command_definitions.append(cmd)
+# # Define parameters for 1st command
+# cmd = {
+#     'cmd_name': 'Pull BOM Data',
+#     'cmd_description': 'Update Fusion 360 Component Meta-Data from Google Sheets',
+#     'cmd_id': 'cmdID_FusionSheeterBOMPullCommand',
+#     'cmd_resources': './resources',
+#     'workspace': 'FusionSolidEnvironment',
+#     'toolbar_panel_id': 'Sheeter',
+#     'command_promoted': False,
+#     'class': FusionSheeterBOMPullCommand
+# }
+# command_definitions.append(cmd)
+#
+# # Define parameters for 1st command
+# cmd = {
+#     'cmd_name': 'Pull Parameter Data',
+#     'cmd_description': 'Update Fusion 360 Component Parameters from Google Sheets',
+#     'cmd_id': 'cmdID_FusionSheeterParametersPullCommand',
+#     'cmd_resources': './resources',
+#     'workspace': 'FusionSolidEnvironment',
+#     'toolbar_panel_id': 'Sheeter',
+#     'command_promoted': False,
+#     'class': FusionSheeterParameterPullCommand
+# }
+# command_definitions.append(cmd)
+#
+# # Define parameters for 1st command
+# cmd = {
+#     'cmd_name': 'Pull Feature Data',
+#     'cmd_description': 'Update Fusion 360 Feature Suppression from Google Sheets',
+#     'cmd_id': 'cmdID_FusionSheeterFeaturePullCommand',
+#     'cmd_resources': './resources',
+#     'workspace': 'FusionSolidEnvironment',
+#     'toolbar_panel_id': 'Sheeter',
+#     'command_promoted': False,
+#     'class': FusionSheeterFeaturePullCommand
+# }
+# command_definitions.append(cmd)
+#
+# # Define parameters for 1st command
+# cmd = {
+#     'cmd_name': 'Push BOM Data',
+#     'cmd_description': 'Update Google Sheets Document with Fusion 360 Component Meta-Data',
+#     'cmd_id': 'cmdID_FusionSheeterBOMPushCommand',
+#     'cmd_resources': './resources',
+#     'workspace': 'FusionSolidEnvironment',
+#     'toolbar_panel_id': 'Sheeter',
+#     'command_promoted': False,
+#     'class': FusionSheeterBOMPushCommand
+# }
+# command_definitions.append(cmd)
 
 # Define parameters for 1st command
 cmd = {
