@@ -278,26 +278,34 @@ def create_sheet(name):
     service = get_sheets_service()
 
     request = service.spreadsheets().create(body=spreadsheet_body)
-    response = request.execute()
+    spreadsheet_response = request.execute()
 
-    new_id = response['spreadsheetId']
-
-    return new_id
+    return spreadsheet_response
 
 
 # Not currently working for some reason
-def add_protected_ranges(spreadsheet_id):
+def add_protected_ranges(spreadsheet):
     service = get_sheets_service()
+
+    sheets = spreadsheet['sheets']
+
+    sheet_ids = {}
+
+    # TODO sheet names should bee configurable in general
+    for sheet in sheets:
+        sheet_id = sheet['properties']['sheetId']
+        title = sheet['properties']['title']
+        sheet_ids[title] = sheet_id
 
     requests = [
         {
             "addProtectedRange": {
                 'protectedRange': {
                     "range": {
-                        "sheetId": 1,
-                        "startRowIndex": 1,
+                        "sheetId": sheet_ids['BOM'],
+                        "startRowIndex": 0,
                         "endRowIndex": 1,
-                        "startColumnIndex": 1
+                        "startColumnIndex": 0
                     },
                     "description": "BOM Headers must not be changed",
                     "warningOnly": True
@@ -308,9 +316,9 @@ def add_protected_ranges(spreadsheet_id):
             "addProtectedRange": {
                 'protectedRange': {
                     "range": {
-                        "sheetId": 0,
+                        "sheetId": sheet_ids['Parameters'],
                         "startRowIndex": 0,
-                        "endRowIndex": 0,
+                        "endRowIndex": 1,
                         "startColumnIndex": 0
                     },
                     "description": "Headers must match Parameter names in Fusion 360",
@@ -323,10 +331,10 @@ def add_protected_ranges(spreadsheet_id):
             "addProtectedRange": {
                 'protectedRange': {
                     "range": {
-                        "sheetId": 2,
+                        "sheetId": sheet_ids['Features'],
                         "startRowIndex": 1,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 1,
+                        "endColumnIndex": 2,
 
                     },
                     "description": "Name and Number driven from Parameters Sheet",
@@ -339,9 +347,9 @@ def add_protected_ranges(spreadsheet_id):
             "addProtectedRange": {
                 'protectedRange': {
                     "range": {
-                        "sheetId": 2,
+                        "sheetId": sheet_ids['Features'],
                         "startRowIndex": 0,
-                        "endRowIndex": 0,
+                        "endRowIndex": 1,
                         "startColumnIndex": 0
 
                     },
@@ -357,7 +365,7 @@ def add_protected_ranges(spreadsheet_id):
     body = {
         'requests': requests
     }
-    response = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
+    response = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet['spreadsheetId'],
                                                   body=body).execute()
 
 
@@ -768,13 +776,17 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         name = name[:name.rfind(' v')]
 
         if input_values['new_or_existing'] == 'Create New Sheet':
-            new_id = create_sheet(name)
+            spreadsheet = create_sheet(name)
+            new_id = spreadsheet['spreadsheetId']
+
             create_sheet_parameters(new_id, all_params)
+
             create_sheet_bom(new_id)
 
             # Todo optional only renamed features?
             create_sheet_suppression(new_id, True)
-            # add_protected_ranges(new_id)
+
+            add_protected_ranges(spreadsheet)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']
