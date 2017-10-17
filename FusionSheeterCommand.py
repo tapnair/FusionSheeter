@@ -1,5 +1,6 @@
 import adsk.core
 import adsk.fusion
+import adsk.cam
 import traceback
 
 from .Fusion360Utilities.Fusion360Utilities import get_app_objects
@@ -22,14 +23,17 @@ from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
 
+# Globals for multiple command execution
+operation_list = []
+post_name = None
+output_folder = None
+the_file_name = None
+gcode_index = 0
+gcode_test = 25
+params_list = []
+feature_list = []
+
 BOM_Item = namedtuple('BOM_Item', ('part_number', 'part_name', 'description', 'children', 'level'))
-
-try:
-    import argparse
-
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
-except ImportError:
-    flags = None
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/sheets.googleapis.com-python-quickstart.json
@@ -59,15 +63,13 @@ def get_credentials():
     if not credentials or credentials.invalid:
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
-        if flags:
-            credentials = tools.run_flow(flow, store, flags)
-        else:  # Needed only for compatibility with Python 2.6
-            credentials = tools.run(flow, store)
+        credentials = tools.run(flow, store)
         print('Storing credentials to ' + credential_path)
     return credentials
 
 
 def get_sheets_service():
+
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     discoveryUrl = ('https://sheets.googleapis.com/$discovery/rest?'
@@ -110,7 +112,7 @@ def get_row_id():
     return int(row_id)
 
 
-def get_sheet_data(range_name, spreadsheet_id):
+def sheets_get(spreadsheet_id, range_name):
     app_objects = get_app_objects()
     ui = app_objects['ui']
 
@@ -121,6 +123,14 @@ def get_sheet_data(range_name, spreadsheet_id):
 
     if not result:
         ui.messageBox('Could not connect to Sheet.  Try again or make sure you have the correct Sheet ID')
+        adsk.terrminate()
+
+    return result
+
+
+def get_sheet_data(range_name, spreadsheet_id):
+
+    result = sheets_get(spreadsheet_id, range_name)
 
     rows = result.get('values', [])
 
@@ -134,16 +144,8 @@ def get_sheet_data(range_name, spreadsheet_id):
 
 
 def get_feature_sheet_data(range_name, spreadsheet_id):
-    app_objects = get_app_objects()
-    ui = app_objects['ui']
 
-    service = get_sheets_service()
-
-    result = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id, range=range_name).execute()
-
-    if not result:
-        ui.messageBox('Could not connect to Sheet.  Try again or make sure you have the correct Sheet ID')
+    result = sheets_get(spreadsheet_id, range_name)
 
     rows = result.get('values', [])
 
@@ -375,7 +377,7 @@ def create_sheet_parameters(sheet_id, all_params):
     um = app_objects['units_manager']
     design = app_objects['design']
 
-    service = get_sheets_service()
+
 
     if all_params:
         parameters = design.allParameters
@@ -402,7 +404,14 @@ def create_sheet_parameters(sheet_id, all_params):
     range_body = {"range": "Parameters",
                   "values": [headers, dims]}
 
-    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='Parameters', body=range_body,
+    sheet_range = 'Parameters'
+
+    sheet_update(sheet_id, sheet_range, range_body)
+
+
+def sheet_update(sheet_id, sheet_range, range_body):
+    service = get_sheets_service()
+    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range=sheet_range, body=range_body,
                                                      valueInputOption='USER_ENTERED')
     response = request.execute()
 
@@ -413,8 +422,6 @@ def create_sheet_suppression(sheet_id, all_features):
     um = app_objects['units_manager']
     design = app_objects['design']
     ui = app_objects['ui']
-
-    service = get_sheets_service()
 
     headers = []
     dims = []
@@ -453,14 +460,14 @@ def create_sheet_suppression(sheet_id, all_features):
     # Execute Request
     range_body = {"range": "Features", "values": values}
 
-    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='Features', body=range_body,
-                                                     valueInputOption='USER_ENTERED')
-    response = request.execute()
+    sheet_range = 'Features'
+
+    sheet_update(sheet_id, sheet_range, range_body)
+
 
 
 # Create Unique name for time line objects
 def get_time_line_object_name(time_line_object):
-
     app_objects = get_app_objects()
     root_comp = app_objects['root_comp']
     feature_name = ''
@@ -468,7 +475,6 @@ def get_time_line_object_name(time_line_object):
     try:
         component = time_line_object.entity.parentComponent
         if root_comp.revisionId != component.revisionId:
-
             feature_name += component.name + ':'
     except:
         pass
@@ -482,10 +488,6 @@ def get_time_line_object_name(time_line_object):
 # Also called during push update (overwrites everything)
 def create_sheet_bom(sheet_id):
     app_objects = get_app_objects()
-    um = app_objects['units_manager']
-    design = app_objects['design']
-
-    service = get_sheets_service()
 
     headers = []
     sheet_values = []
@@ -506,10 +508,8 @@ def create_sheet_bom(sheet_id):
 
     # Create Request
     range_body = {"range": "BOM", "values": sheet_values}
-
-    request = service.spreadsheets().values().update(spreadsheetId=sheet_id, range='BOM', body=range_body,
-                                                     valueInputOption='USER_ENTERED')
-    response = request.execute()
+    sheet_range = 'BOM'
+    sheet_update(sheet_id, sheet_range, range_body)
 
 
 # Appends BOM information to sheet values array
@@ -590,6 +590,119 @@ def build_sizes_dropdown(command_inputs, sheet_id):
     size_drop_down.listItems.item(row_id).isSelected = True
 
     return size_drop_down
+
+
+# Updates tool paths and outputs new nc file
+def update_g_code(op_name_, post_name_, output_folder_, index, prefix):
+    global gcode_index
+
+    # TODO use app objects, probably need to switch workspaces?
+    ao = get_app_objects()
+    app = adsk.core.Application.get()
+    doc = app.activeDocument
+    products = doc.products
+    product = products.itemByProductType('CAMProductType')
+    cam = adsk.cam.CAM.cast(product)
+    adsk.doEvents()
+
+    to_post = None
+    # Iterate through CAM objects for operation, folder or setup
+    # Currently doesn't handle duplicate in names
+    for setup in cam.setups:
+        if setup.name == op_name_:
+            to_post = setup
+        else:
+            for folder in setup.folders:
+                if folder.name == op_name_:
+                    to_post = folder
+
+    for operation in cam.allOperations:
+        if operation.name == op_name_:
+            to_post = operation
+
+    if to_post is None:
+        return
+
+    # Update tool path
+    future = cam.generateToolpath(to_post)
+    check = 0
+    while not future.isGenerationCompleted:
+        adsk.doEvents()
+        import time
+
+        time.sleep(1)
+        check += 1
+        if check > 10:
+            ao['ui'].messageBox('Timeout')
+            break
+
+    # Set the post options
+    post_config = os.path.join(cam.genericPostFolder, post_name_)
+    units = adsk.cam.PostOutputUnitOptions.DocumentUnitsOutput
+
+    program_name = prefix + '_' + op_name_
+
+    # create the postInput object
+    post_input = adsk.cam.PostProcessInput.create(program_name, post_config, output_folder_, units)
+    post_input.isOpenInEditor = False
+
+    cam.postProcess(to_post, post_input)
+
+
+# Get default directory
+def get_default_model_dir(model_name):
+    # Get user's home directory
+    default_dir = os.path.expanduser("~")
+
+    model_name = model_name[:model_name.rfind(' v')]
+
+    # Create a subdirectory for this application
+    default_dir = os.path.join(default_dir, 'FusionSheeterOutput', '')
+
+    # Create sub directory for specific model
+    default_dir = os.path.join(default_dir, model_name, '')
+
+    # Create the folder if it does not exist
+    if not os.path.exists(default_dir):
+        os.makedirs(default_dir)
+
+    return default_dir
+
+
+# Switch Current Workspace
+def switch_workspace(workspace_name):
+    ao = get_app_objects()
+
+    workspace = ao['ui'].workspaces.itemById(workspace_name)
+
+    workspace.activate()
+
+
+def execute_next_command(cmd_id):
+    app_objects = get_app_objects()
+    next_command = app_objects['ui'].commandDefinitions.itemById(cmd_id)
+    next_command.execute()
+
+
+# Will update visibility of 3 selection dropdowns based on radio selection
+# Also updates radio selection which is only really useful when command is first launched.
+def set_gcode_drop_down(changed_input, inputs):
+    drop_down = inputs.itemById(changed_input.id[6:])
+
+    if changed_input.value:
+        drop_down.isVisible = True
+    else:
+
+        for item in drop_down.listItems:
+            item.isSelected = False
+        drop_down.isVisible = False
+
+
+def get_operations(input_list, op_list):
+    for item in input_list:
+
+        if item.isSelected:
+            op_list.append(item.name)
 
 
 # Switch current design to a different size
@@ -737,7 +850,7 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
 
                 update_local_features(feature_list_of_lists[index])
 
-            design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+                design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
 
 
 # Command to create a new Google Sheet or link to an existing one
@@ -760,6 +873,11 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
                 command_inputs.itemById('param_title').isVisible = False
                 input_values['parameters_option_input'].isVisible = False
 
+        if changed_input.id == 'parameters_option':
+            if changed_input.selectedItem.name == 'All Parameters':
+                input_values['warning_input'].isVisible = True
+            elif changed_input.selectedItem.name == 'User Parameters Only':
+                input_values['warning_input'].isVisible = False
     # Execute
     def on_execute(self, command, inputs, args, input_values):
 
@@ -841,9 +959,18 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         param_title.isVisible = True
 
         parameters_option_group = command_inputs.addRadioButtonGroupCommandInput('parameters_option')
-        parameters_option_group.listItems.add('All Parameters', True, './resources')
-        parameters_option_group.listItems.add('User Parameters Only', False)
+        parameters_option_group.listItems.add('All Parameters', False, './resources')
+        parameters_option_group.listItems.add('User Parameters Only', True)
         parameters_option_group.isVisible = True
+
+        warning_text = '<br> <b>Warning! </b><br><br>' \
+                       'Equations in dimension expressions are not currently supported:<br><br>' \
+                       '<i>For Example: d1 = d2 + 4 in </i>' \
+                       '<br><br>Use expressions in sheets directly to create this behavior<br><br>'
+
+        warning_input = command_inputs.addTextBoxCommandInput('warning', '',
+                                                              warning_text, 16, True)
+        warning_input.isVisible = False
 
 
 # Command to build all sizes in a sheet
@@ -869,12 +996,95 @@ class FusionSheeterBuildCommand(Fusion360CommandBase):
 
         sizes = get_sheet_data('Parameters', sheet_id)
 
+        feature_list_of_lists = get_feature_sheet_data('Features', sheet_id)
+
         for index, size in enumerate(sizes):
+
             update_local_parameters(size)
+            update_local_features(feature_list_of_lists[index])
 
             design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
 
             document.saveAs(size['Description'], folder, 'Auto Generated by Fusion Sheeter', '')
+
+
+def dup_check(name):
+    if os.path.exists(name):
+        base, ext = os.path.splitext(name)
+        base += '-dup'
+        name = base + ext
+        dup_check(name)
+    return name
+
+
+def export_active_doc(folder, file_types, write_version, index):
+    app = adsk.core.Application.get()
+    design = app.activeProduct
+    export_mgr = design.exportManager
+
+    export_functions = [export_mgr.createIGESExportOptions,
+                        export_mgr.createSTEPExportOptions,
+                        export_mgr.createSATExportOptions,
+                        export_mgr.createSMTExportOptions,
+                        export_mgr.createFusionArchiveExportOptions,
+                        export_mgr.createSTLExportOptions]
+    export_extensions = ['.igs', '.step', '.sat', '.smt', '.f3d', '.stl']
+
+    for i in range(file_types.count):
+
+        if file_types.item(i).isSelected:
+
+            doc_name = app.activeDocument.name
+
+            if not write_version:
+                doc_name = doc_name[:doc_name.rfind(' v')]
+
+            export_name = folder + doc_name + '_' + str(index) + export_extensions[i]
+            export_name = dup_check(export_name)
+            export_options = export_functions[i](export_name)
+            export_mgr.execute(export_options)
+
+
+# Command to build all sizes in a sheet
+# Todo better control for naming and for destination
+class FusionSheeterExportCommand(Fusion360CommandBase):
+
+    # Execute model creation
+    def on_execute(self, command, inputs, args, input_values):
+
+        sheet_id = get_sheet_id()
+
+        sizes = get_sheet_data('Parameters', sheet_id)
+        feature_list_of_lists = get_feature_sheet_data('Features', sheet_id)
+
+        folder = input_values['output_folder']
+        file_types = input_values['file_types_input'].listItems
+        write_version = input_values['write_version']
+
+        for index, size in enumerate(sizes):
+            update_local_parameters(size)
+            update_local_features(feature_list_of_lists[index])
+
+            export_active_doc(folder, file_types, write_version, index)
+
+    def on_create(self, command, command_inputs):
+        app = adsk.core.Application.get()
+        default_dir = get_default_model_dir(app.activeDocument.name)
+
+        command_inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
+
+        drop_input_list = command_inputs.addDropDownCommandInput('file_types', 'Export Types',
+                                                                 adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+
+        drop_input_list = drop_input_list.listItems
+        drop_input_list.add('IGES', False)
+        drop_input_list.add('STEP', True)
+        drop_input_list.add('SAT', False)
+        drop_input_list.add('SMT', False)
+        drop_input_list.add('F3D', False)
+        drop_input_list.add('STL', False)
+
+        command_inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True)
 
 
 # Simply open the associated sheet in a browser
@@ -884,6 +1094,154 @@ class FusionSheeterOpenSheetCommand(Fusion360CommandBase):
         url = 'https://docs.google.com/spreadsheets/d/%s/edit#gid=0' % sheet_id
         webbrowser.open(url, new=2)
 
+
+
+# Class for initial Model Definition and import.
+class FusionSheeterGCodeCommand(Fusion360CommandBase):
+    # This is typically where your main program logic would go
+    def on_execute(self, command, inputs, args, input_values):
+        global operation_list
+        global post_name
+        global output_folder
+        global gcode_index
+        global gcode_test
+        global params_list
+        global feature_list
+
+        operation_list.clear()
+
+        # Get the values from the user input
+        # operation_list = input_values['setup_name']
+        post_name = input_values['post_name']
+        output_folder = input_values['output_folder']
+
+        get_operations(input_values['setups'], operation_list)
+        get_operations(input_values['folders'], operation_list)
+        get_operations(input_values['operations'], operation_list)
+
+        gcode_index = 0
+
+        sheet_id = get_sheet_id()
+        params_list = get_sheet_data('Parameters', sheet_id)
+        feature_list = get_feature_sheet_data('Features', sheet_id)
+
+        gcode_test = len(params_list)
+
+        update_local_parameters(params_list[gcode_index])
+        update_local_features(feature_list[gcode_index])
+
+        execute_next_command('cmdID_FusionSheeterGCodeCommand2')
+
+    # Creates a dialog UI
+    def on_create(self, command, command_inputs):
+
+        app = adsk.core.Application.get()
+        ui = app.userInterface
+        doc = app.activeDocument
+        products = doc.products
+        product = products.itemByProductType('CAMProductType')
+
+        default_dir = get_default_model_dir(app.activeDocument.name)
+
+        # Check if the document has a CAMProductType. It will not if there are no CAM operations in it.
+        if product == None:
+            ui.messageBox('There are no CAM operations in the active document')
+            return
+            # Cast the CAM product to a CAM object (a subtype of product).
+        cam = adsk.cam.CAM.cast(product)
+
+        # Create a few inputs in the UI
+        # command_inputs.addStringValueInput('setup_name', 'CAM Setup Name', 'Setup1')
+        # Todo auto populate post list
+        command_inputs.addStringValueInput('post_name', 'Post to Use:', 'grbl.cps')
+        command_inputs.addStringValueInput('output_folder', 'Output Folder:', default_dir)
+
+        # What to select from?  Setups, Folders, Operations?
+        group_input = command_inputs.addGroupCommandInput("showOperations", 'What to Post?')
+        group_input.children.addBoolValueInput("group_setups", "Setups", True, '', True)
+        group_input.children.addBoolValueInput("group_folders", "Folders", True, '', False)
+        group_input.children.addBoolValueInput("group_operations", "Operations", True, '', False)
+
+        # Drop down for Setups
+        setup_drop_down = command_inputs.addDropDownCommandInput('setups', 'Select Setup(s):',
+                                                                 adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+        # Drop down for Folders
+        folder_drop_down = command_inputs.addDropDownCommandInput('folders', 'Select Folder(s):',
+                                                                  adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+        # Drop down for Operations
+        op_drop_down = command_inputs.addDropDownCommandInput('operations', 'Select Operation(s):',
+                                                              adsk.core.DropDownStyles.CheckBoxDropDownStyle)
+
+        # Populate values in drop downs based on current document:
+
+        for setup in cam.setups:
+            setup_drop_down.listItems.add(setup.name, False)
+            for folder in setup.folders:
+                folder_drop_down.listItems.add(folder.name, False)
+        for operation in cam.allOperations:
+            op_drop_down.listItems.add(operation.name, False)
+
+        op_drop_down.isVisible = False
+        folder_drop_down.isVisible = False
+
+    # Update dialog based on user selections
+    def on_input_changed(self, command_, command_inputs, changed_input, input_values):
+        # Check to see if the post type has changed and show appropriate drop down
+        if changed_input.parentCommandInput:
+            if changed_input.parentCommandInput.id == 'showOperations':
+                set_gcode_drop_down(changed_input, command_inputs)
+
+
+class FusionSheeterGCodeCommand2(Fusion360CommandBase):
+    # Update the G-Code
+    def on_execute(self, command, inputs, args, input_values):
+        global operation_list
+        global post_name
+        global output_folder
+        global gcode_index
+        global gcode_test
+        global params_list
+        global feature_list
+
+        switch_workspace('CAMEnvironment')
+
+        # app = adsk.core.Application.get()
+        # ui = app.userInterface
+        # ui.messageBox(operation_list)
+
+        # Todo make this configurable
+        prefix = params_list[gcode_index]['Part Number'] + '_' + params_list[gcode_index]['Description']
+        for operation in operation_list:
+            update_g_code(operation, post_name, output_folder, gcode_index, prefix)
+
+        switch_workspace('FusionSolidEnvironment')
+
+        gcode_index += 1
+
+        if gcode_index < gcode_test:
+            execute_next_command('cmdID_FusionSheeterGCodeCommand3')
+
+
+# Class for initial Model Definition and import.
+class FusionSheeterGCodeCommand3(Fusion360CommandBase):
+    # Run when the user presses OK
+    # This is typically where your main program logic would go
+    def on_execute(self, command, inputs, args, input_values):
+        global operation_list
+        global post_name
+        global output_folder
+        global the_file_name
+        global params_list
+        global gcode_index
+        global feature_list
+
+        update_local_parameters(params_list[gcode_index])
+        update_local_features(feature_list[gcode_index])
+
+        execute_next_command('cmdID_FusionSheeterGCodeCommand2')
+
+
+############################# End of useful #########################################
 
 # Todo Delete
 #  Delete Classes below most likely ###############
