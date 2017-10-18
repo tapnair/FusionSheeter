@@ -116,6 +116,25 @@ def sheets_get(spreadsheet_id, range_name):
     return result
 
 
+# Get Values from a sheet
+def sheets_get2(spreadsheet_id):
+
+    sheet_ranges = ['Parameters', 'BOM', 'Features']
+    service = get_sheets_service()
+    response = service.spreadsheets().values().batchGet(spreadsheetId=spreadsheet_id, ranges=sheet_ranges).execute()
+
+    if not response:
+        # Todo change to raise?
+        app_objects = get_app_objects()
+        ui = app_objects['ui']
+        ui.messageBox('Could not connect to Sheet.  Try again or make sure you have the correct Sheet ID')
+        adsk.terrminate()
+
+    value_ranges = response.get("valueRanges", [])
+
+    return value_ranges
+
+
 # Update values in a Sheet
 def sheets_update(sheet_id, sheet_range, range_body):
     service = get_sheets_service()
@@ -137,6 +156,45 @@ def get_parameters(range_name, spreadsheet_id):
         dict_list.append(row_dict)
 
     return dict_list
+
+
+def get_parameters2(value_ranges):
+
+    rows = value_ranges[0].get('values', [])
+
+    dict_list = []
+
+    for row in rows[1:]:
+        row_dict = dict(zip(rows[0], row))
+        dict_list.append(row_dict)
+
+    return dict_list
+
+
+def get_bom2(value_ranges):
+
+    rows = value_ranges[1].get('values', [])
+
+    dict_list = []
+
+    for row in rows[1:]:
+        row_dict = dict(zip(rows[0], row))
+        dict_list.append(row_dict)
+
+    return dict_list
+
+
+def get_features2(value_ranges):
+
+    rows = value_ranges[2].get('values', [])
+
+    list_of_lists = []
+
+    for row in rows[1:]:
+        row_list = list(zip(rows[0], row))
+        list_of_lists.append(row_list)
+
+    return list_of_lists
 
 
 def get_features(range_name, spreadsheet_id):
@@ -1299,23 +1357,23 @@ class FusionSheeterPaletteCommand(Fusion360CommandBase):
             palette.isVisible = True
 
 
-# # Class for initial Model Definition and import.
-# class FusionSheeterQuickPullCommand(Fusion360CommandBase):
-#     # Run when the user presses OK
-#     # This is typically where your main program logic would go
-#     def on_execute(self, command, inputs, args, input_values):
-#         row_id = get_row_id()
-#
-#         items = get_parameters('BOM', sheet_id)
-#         update_local_bom(items)
-#
-#         items = get_parameters('Parameters', sheet_id)
-#
-#         update_local_parameters(items[index])
-#
-#
-#         feature_list_of_lists = get_features('Features', sheet_id)
-#
-#         update_local_features(feature_list_of_lists[index])
-#
-#         result = sheets_get(spreadsheet_id, range_name)
+# Class for initial Model Definition and import.
+class FusionSheeterQuickPullCommand(Fusion360CommandBase):
+    # Run when the user presses OK
+    # This is typically where your main program logic would go
+    def on_execute(self, command, inputs, args, input_values):
+
+        row_id = get_row_id()
+        spreadsheet_id = get_sheet_id()
+
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        bom_items = get_bom2(value_ranges)
+        update_local_bom(bom_items)
+
+        parameters = get_parameters2(value_ranges)
+        update_local_parameters(parameters[row_id])
+
+        features = get_features2(value_ranges)
+        update_local_features(features[row_id])
+

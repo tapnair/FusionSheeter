@@ -2,8 +2,8 @@
 # Could import multiple Command definitions here
 from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
     FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, \
-    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand,\
-FusionSheeterPaletteCommand
+    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand, \
+    FusionSheeterPaletteCommand, FusionSheeterQuickPullCommand
 
 commands = []
 command_definitions = []
@@ -135,6 +135,20 @@ cmd = {
     'toolbar_panel_id': 'Sheeter',
     'command_promoted': False,
     'class': FusionSheeterPaletteCommand
+}
+command_definitions.append(cmd)
+
+
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Quick Pull',
+    'cmd_description': 'Sync data from Google Sheets into model',
+    'cmd_id': 'cmdID_FusionSheeterQuickPullCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_in_nav_bar': True,
+    'class': FusionSheeterQuickPullCommand
 }
 command_definitions.append(cmd)
 # Set to True to display various useful messages when debugging your app

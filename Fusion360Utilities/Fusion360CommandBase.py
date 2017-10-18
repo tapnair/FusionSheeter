@@ -246,10 +246,11 @@ class Fusion360CommandBase:
                 else:
                     new_control.isVisible = False
 
-                if self.command_promoted:
-                    new_control.isPromoted = True
-                else:
-                    new_control.isPromoted = False
+                if not self.command_in_nav_bar:
+                    if self.command_promoted:
+                        new_control.isPromoted = True
+                    else:
+                        new_control.isPromoted = False
 
 
         except:
