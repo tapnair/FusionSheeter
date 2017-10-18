@@ -184,6 +184,8 @@ class Fusion360CommandBase:
         # global set of event handlers to keep them referenced for the duration of the command
         self.handlers = []
 
+        self.palette_id = ''
+
     def on_preview(self, command, inputs, args, input_values):
         pass
 
@@ -280,6 +282,9 @@ class Fusion360CommandBase:
                     destroy_object(drop_down_control)
                     destroy_object(drop_down_definition)
 
+            palette = ui.palettes.itemById(self.palette_id)
+            if palette:
+                palette.deleteMe()
         except:
             if ui:
                 ui.messageBox('AddIn Stop Failed: {}'.format(traceback.format_exc()))

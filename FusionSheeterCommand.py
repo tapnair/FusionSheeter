@@ -598,6 +598,7 @@ def update_local_bom(items):
 
 # Create a dropdown based on descriptions on Parameters page
 def build_sizes_dropdown(command_inputs, sheet_id):
+
     sizes = get_parameters('Parameters', sheet_id)
 
     size_drop_down = command_inputs.addDropDownCommandInput('Size', 'Current Size (Associated Sheet Row)',
@@ -1259,3 +1260,62 @@ class FusionSheeterGCodeCommand3(Fusion360CommandBase):
         update_local_features(feature_list[gcode_index])
 
         execute_next_command('cmdID_FusionSheeterGCodeCommand2')
+
+
+# Class for initial Model Definition and import.
+class FusionSheeterPaletteCommand(Fusion360CommandBase):
+    # Run when the user presses OK
+    # This is typically where your main program logic would go
+    def on_execute(self, command, inputs, args, input_values):
+
+        app = adsk.core.Application.get()
+        ui = app.userInterface
+
+        sheet_id = get_sheet_id()
+
+        self.palette_id = 'sheets_palette'
+
+        # Create and display the palette.
+        palette = ui.palettes.itemById(self.palette_id)
+
+        url = 'https://docs.google.com/spreadsheets/d/%s/edit' % sheet_id
+
+        if not palette:
+            palette = ui.palettes.add(self.palette_id, 'Fusion Sheeter', url, True, True, True, 300, 300)
+
+            # Dock the palette to the right side of Fusion window.
+            palette.dockingState = adsk.core.PaletteDockingStates.PaletteDockStateBottom
+            # # Add handler to HTMLEvent of the palette.
+            # onHTMLEvent = MyHTMLEventHandler()
+            # palette.incomingFromHTML.add(onHTMLEvent)
+            # handlers.append(onHTMLEvent)
+            #
+            # # Add handler to CloseEvent of the palette.
+            # onClosed = MyCloseEventHandler()
+            # palette.closed.add(onClosed)
+            # handlers.append(onClosed)
+        else:
+            palette.htmlFileURL = url
+            palette.isVisible = True
+
+
+# # Class for initial Model Definition and import.
+# class FusionSheeterQuickPullCommand(Fusion360CommandBase):
+#     # Run when the user presses OK
+#     # This is typically where your main program logic would go
+#     def on_execute(self, command, inputs, args, input_values):
+#         row_id = get_row_id()
+#
+#         items = get_parameters('BOM', sheet_id)
+#         update_local_bom(items)
+#
+#         items = get_parameters('Parameters', sheet_id)
+#
+#         update_local_parameters(items[index])
+#
+#
+#         feature_list_of_lists = get_features('Features', sheet_id)
+#
+#         update_local_features(feature_list_of_lists[index])
+#
+#         result = sheets_get(spreadsheet_id, range_name)

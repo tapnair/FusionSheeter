@@ -2,7 +2,8 @@
 # Could import multiple Command definitions here
 from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
     FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, \
-    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand
+    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand,\
+FusionSheeterPaletteCommand
 
 commands = []
 command_definitions = []
@@ -124,6 +125,18 @@ cmd = {
 }
 command_definitions.append(cmd)
 
+# Define parameters for 1st command
+cmd = {
+    'cmd_name': 'Open Sheet in Fusion360',
+    'cmd_description': 'Edit the Google Sheet Document in context of Fusion 360',
+    'cmd_id': 'cmdID_FusionSheeterPaletteCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_promoted': False,
+    'class': FusionSheeterPaletteCommand
+}
+command_definitions.append(cmd)
 # Set to True to display various useful messages when debugging your app
 debug = False
 
