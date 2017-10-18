@@ -1,9 +1,8 @@
 # Importing sample Fusion Command
 # Could import multiple Command definitions here
 from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
-     FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand,\
-     FusionSheeterFeaturePullCommand, FusionSheeterBOMPullCommand, FusionSheeterBOMPushCommand, \
-    FusionSheeterParameterPullCommand
+    FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, \
+    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand
 
 commands = []
 command_definitions = []
@@ -48,7 +47,7 @@ cmd = {
 }
 command_definitions.append(cmd)
 
-# Define parameters for 1st command
+# Define parameters for command
 cmd = {
     'cmd_name': 'Change Size',
     'cmd_description': 'Change association of active model to a different row in Sheets Document',
@@ -60,57 +59,57 @@ cmd = {
 }
 command_definitions.append(cmd)
 
-# # Define parameters for 1st command
-# cmd = {
-#     'cmd_name': 'Pull BOM Data',
-#     'cmd_description': 'Update Fusion 360 Component Meta-Data from Google Sheets',
-#     'cmd_id': 'cmdID_FusionSheeterBOMPullCommand',
-#     'cmd_resources': './resources',
-#     'workspace': 'FusionSolidEnvironment',
-#     'toolbar_panel_id': 'Sheeter',
-#     'command_promoted': False,
-#     'class': FusionSheeterBOMPullCommand
-# }
-# command_definitions.append(cmd)
-#
-# # Define parameters for 1st command
-# cmd = {
-#     'cmd_name': 'Pull Parameter Data',
-#     'cmd_description': 'Update Fusion 360 Component Parameters from Google Sheets',
-#     'cmd_id': 'cmdID_FusionSheeterParametersPullCommand',
-#     'cmd_resources': './resources',
-#     'workspace': 'FusionSolidEnvironment',
-#     'toolbar_panel_id': 'Sheeter',
-#     'command_promoted': False,
-#     'class': FusionSheeterParameterPullCommand
-# }
-# command_definitions.append(cmd)
-#
-# # Define parameters for 1st command
-# cmd = {
-#     'cmd_name': 'Pull Feature Data',
-#     'cmd_description': 'Update Fusion 360 Feature Suppression from Google Sheets',
-#     'cmd_id': 'cmdID_FusionSheeterFeaturePullCommand',
-#     'cmd_resources': './resources',
-#     'workspace': 'FusionSolidEnvironment',
-#     'toolbar_panel_id': 'Sheeter',
-#     'command_promoted': False,
-#     'class': FusionSheeterFeaturePullCommand
-# }
-# command_definitions.append(cmd)
-#
-# # Define parameters for 1st command
-# cmd = {
-#     'cmd_name': 'Push BOM Data',
-#     'cmd_description': 'Update Google Sheets Document with Fusion 360 Component Meta-Data',
-#     'cmd_id': 'cmdID_FusionSheeterBOMPushCommand',
-#     'cmd_resources': './resources',
-#     'workspace': 'FusionSolidEnvironment',
-#     'toolbar_panel_id': 'Sheeter',
-#     'command_promoted': False,
-#     'class': FusionSheeterBOMPushCommand
-# }
-# command_definitions.append(cmd)
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Generate NC for all sizes',
+    'cmd_description': 'Generate NC files for all sizes in associated Sheet',
+    'cmd_id': 'cmdID_FusionSheeterGCodeCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_visible': True,
+    'class': FusionSheeterGCodeCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Generate NC for all sizes',
+    'cmd_description': 'Generate NC files for all sizes in associated Sheet',
+    'cmd_id': 'cmdID_FusionSheeterGCodeCommand2',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_visible': False,
+    'class': FusionSheeterGCodeCommand2
+}
+command_definitions.append(cmd)
+
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Generate NC for all sizes',
+    'cmd_description': 'Generate NC files for all sizes in associated Sheet',
+    'cmd_id': 'cmdID_FusionSheeterGCodeCommand3',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_visible': False,
+    'class': FusionSheeterGCodeCommand3
+}
+command_definitions.append(cmd)
+
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Export all sizes locally',
+    'cmd_description': 'Generate local export files for all sizes in associated Sheet',
+    'cmd_id': 'cmdID_FusionSheeterExportCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'command_visible': True,
+    'class': FusionSheeterExportCommand
+}
+command_definitions.append(cmd)
 
 # Define parameters for 1st command
 cmd = {
@@ -127,7 +126,6 @@ command_definitions.append(cmd)
 
 # Set to True to display various useful messages when debugging your app
 debug = False
-
 
 # Don't change anything below here:
 for cmd_def in command_definitions:
