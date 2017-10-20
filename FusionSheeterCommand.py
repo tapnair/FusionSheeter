@@ -256,13 +256,20 @@ def update_local_parameters(size):
 
         new_value = size.get(parameter.name)
         if new_value is not None:
+            unit_type = parameter.unit
 
-            if um.isValidExpression(new_value, um.defaultLengthUnits):
-                sheet_value = um.evaluateExpression(new_value, um.defaultLengthUnits)
+            if len(unit_type) > 0:
 
-                # TODO handle units with an attribute that is written on create.  Can be set for link
-                if parameter.value != sheet_value:
-                    parameter.value = sheet_value
+                if um.isValidExpression(new_value, unit_type):
+                    sheet_value = um.evaluateExpression(new_value, unit_type)
+                else:
+                    continue
+            else:
+                sheet_value = float(new_value)
+
+            # TODO handle units with an attribute that is written on create.  Can be set for link
+            if parameter.value != sheet_value:
+                parameter.value = sheet_value
 
     new_number = size.get('Part Number')
     if new_number is not None:
@@ -463,8 +470,6 @@ def create_sheet_parameters(sheet_id, all_params):
     um = app_objects['units_manager']
     design = app_objects['design']
 
-
-
     if all_params:
         parameters = design.allParameters
     else:
@@ -485,7 +490,7 @@ def create_sheet_parameters(sheet_id, all_params):
 
     for parameter in parameters:
         headers.append(parameter.name)
-        dims.append(um.formatInternalValue(parameter.value, "DefaultDistance", False))
+        dims.append(um.formatInternalValue(parameter.value, parameter.unit, False))
 
     range_body = {"range": "Parameters",
                   "values": [headers, dims]}

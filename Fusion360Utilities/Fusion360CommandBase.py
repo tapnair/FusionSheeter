@@ -186,6 +186,8 @@ class Fusion360CommandBase:
 
         self.palette_id = ''
 
+        self.add_separator = cmd_def.get('add_separator', False)
+
     def on_preview(self, command, inputs, args, input_values):
         pass
 
@@ -252,6 +254,8 @@ class Fusion360CommandBase:
                     else:
                         new_control.isPromoted = False
 
+            if self.add_separator:
+                controls_to_add_to.addSeparator()
 
         except:
             if ui:
