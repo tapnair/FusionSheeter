@@ -5,11 +5,13 @@ import traceback
 
 from .Fusion360Utilities.Fusion360Utilities import get_app_objects
 from .Fusion360Utilities.Fusion360CommandBase import Fusion360CommandBase
+from .Fusion360Utilities.Fusion360DebugUtilities import variable_message
 
 import os
 import sys
 import csv
 import webbrowser
+import time
 
 from collections import defaultdict, namedtuple
 
@@ -25,6 +27,8 @@ gcode_index = 0
 gcode_test = 25
 params_list = []
 feature_list = []
+
+operation_collection = None
 
 BOM_Item = namedtuple('BOM_Item', ('part_number', 'part_name', 'description', 'children', 'level'))
 
@@ -660,14 +664,16 @@ def update_local_bom(items):
 
 
 # Create a dropdown based on descriptions on Parameters page
-def build_sizes_dropdown(command_inputs, sheet_id):
+def build_sizes_dropdown(command_inputs, value_ranges):
 
-    sizes = get_parameters('Parameters', sheet_id)
+    # sizes = get_parameters('Parameters', sheet_id)
+
+    parameters = get_parameters2(value_ranges)
 
     size_drop_down = command_inputs.addDropDownCommandInput('Size', 'Current Size (Associated Sheet Row)',
                                                             adsk.core.DropDownStyles.LabeledIconDropDownStyle)
 
-    for size in sizes:
+    for size in parameters:
         size_drop_down.listItems.add(size['Description'], False)
 
     row_id = get_row_id()
@@ -677,61 +683,96 @@ def build_sizes_dropdown(command_inputs, sheet_id):
     return size_drop_down
 
 
-# Updates tool paths and outputs new nc file
-def update_g_code(op_name_, post_name_, output_folder_, index, prefix):
-    global gcode_index
+def gcode_regen_tool_paths(operation_collection_):
+    app = adsk.core.Application.get()
+    doc = app.activeDocument
+    ui = app.userInterface
+    products = doc.products
+    product = products.itemByProductType('CAMProductType')
+    cam = adsk.cam.CAM.cast(product)
 
+
+    adsk.doEvents()
+
+    # Update tool path
+    future = cam.generateToolpath(operation_collection_)
+    check = 0
+    while not future.isGenerationCompleted:
+        adsk.doEvents()
+
+        time.sleep(.1)
+        check += 1
+        if check > 1000:
+            ui.messageBox('Timeout')
+            break
+
+
+def build_op_collection(operation_list_):
     # TODO use app objects, probably need to switch workspaces?
-    ao = get_app_objects()
     app = adsk.core.Application.get()
     doc = app.activeDocument
     products = doc.products
     product = products.itemByProductType('CAMProductType')
     cam = adsk.cam.CAM.cast(product)
-    adsk.doEvents()
 
-    to_post = None
-    # Iterate through CAM objects for operation, folder or setup
-    # Currently doesn't handle duplicate in names
-    for setup in cam.setups:
-        if setup.name == op_name_:
-            to_post = setup
-        else:
-            for folder in setup.folders:
-                if folder.name == op_name_:
-                    to_post = folder
+    operation_collection_ = adsk.core.ObjectCollection.create()
 
-    for operation in cam.allOperations:
-        if operation.name == op_name_:
-            to_post = operation
+    for operation_name in operation_list_:
+        for setup in cam.setups:
+            if setup.name == operation_name:
+                operation_collection_.add(setup)
+            else:
+                for folder in setup.folders:
+                    if folder.name == operation_name:
+                        operation_collection_.add(folder)
 
-    if to_post is None:
-        return
+        for operation in cam.allOperations:
+            if operation.name == operation_name:
+                operation_collection_.add(operation)
 
-    # Update tool path
-    future = cam.generateToolpath(to_post)
-    check = 0
-    while not future.isGenerationCompleted:
-        adsk.doEvents()
-        import time
+    return operation_collection_
 
-        time.sleep(1)
-        check += 1
-        if check > 10:
-            ao['ui'].messageBox('Timeout')
-            break
 
-    # Set the post options
+# Updates tool paths and outputs new nc file
+def g_code_post_operation(operation, post_name_, output_folder_, prefix):
+
+    # TODO use app objects, probably need to switch workspaces?
+    app = adsk.core.Application.get()
+    doc = app.activeDocument
+    products = doc.products
+    product = products.itemByProductType('CAMProductType')
+    cam = adsk.cam.CAM.cast(product)
+
     post_config = os.path.join(cam.genericPostFolder, post_name_)
     units = adsk.cam.PostOutputUnitOptions.DocumentUnitsOutput
 
-    program_name = prefix + '_' + op_name_
+    program_name = prefix + '_' + operation.name
 
+    program_name = program_name.replace(" ", "")
+
+    # variable_message(program_name)
+    # variable_message(output_folder_)
+    # variable_message(post_config)
+
+    # program_name = '1001'
     # create the postInput object
     post_input = adsk.cam.PostProcessInput.create(program_name, post_config, output_folder_, units)
     post_input.isOpenInEditor = False
 
-    cam.postProcess(to_post, post_input)
+    # variable_message(post_input.outputFolder, 'folder')
+    # variable_message(post_input.isValid, 'valid')
+    # variable_message(post_input.postConfiguration, 'config')
+    # variable_message(post_input.outputUnits, 'units')
+    # variable_message(post_input.programName, 'name')
+    # variable_message(os.path.exists(post_config), 'post path exists?')
+    # variable_message(os.path.exists(output_folder_), 'folder path exists?')
+    # variable_message(operation.isGenerating, 'operation isGenerating')
+    # variable_message(operation.hasToolpath, 'operation hasToolpath')
+    # variable_message(operation.hasWarning, 'operation hasWarning')
+
+    result = cam.postProcess(operation, post_input)
+
+    # variable_message(result, 'result')
 
 
 # Get default directory
@@ -829,37 +870,67 @@ def export_active_doc(folder, file_types, write_version, index):
 
 # Switch current design to a different size
 class FusionSheeterSizeCommand(Fusion360CommandBase):
+
+    def __init__(self, cmd_def, debug):
+        super().__init__(cmd_def, debug)
+        self.value_ranges = []
+
     # All size changes done during preview.  Ok commits switch
     def on_preview(self, command, inputs, args, input_values):
+
         app_objects = get_app_objects()
         design = app_objects['design']
 
         # TODO add a 'current values' to top of list
         index = input_values['Size_input'].selectedItem.index
 
-        sheet_id = get_sheet_id()
+        # row_id = get_row_id()
+        # spreadsheet_id = get_sheet_id()
+        #
+        # value_ranges = sheets_get2(spreadsheet_id)
 
-        sizes = get_parameters('Parameters', sheet_id)
-        update_local_parameters(sizes[index])
+        value_ranges = self.value_ranges
 
-        feature_list_of_lists = get_features('Features', sheet_id)
-        update_local_features(feature_list_of_lists[index])
+        bom_items = get_bom2(value_ranges)
+        update_local_bom(bom_items)
+
+        parameters = get_parameters2(value_ranges)
+        update_local_parameters(parameters[index])
+
+        features = get_features2(value_ranges)
+        update_local_features(features[index])
+
+        # sheet_id = get_sheet_id()
+
+        # sizes = get_parameters('Parameters', sheet_id)
+        # update_local_parameters(sizes[index])
+        #
+        # feature_list_of_lists = get_features('Features', sheet_id)
+        # update_local_features(feature_list_of_lists[index])
 
         design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
 
         args.isValidResult = True
 
     def on_create(self, command, command_inputs):
-        sheet_id = get_sheet_id()
 
-        size_drop_down = build_sizes_dropdown(command_inputs, sheet_id)
+        spreadsheet_id = get_sheet_id()
+
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        self.value_ranges = value_ranges
+
+        size_drop_down = build_sizes_dropdown(command_inputs, value_ranges)
 
 
 class FusionSheeterSyncCommand(Fusion360CommandBase):
+
+    def __init__(self, cmd_def, debug):
+        super().__init__(cmd_def, debug)
+        self.value_ranges = []
+
     # Dialog for sync feature
     def on_create(self, command, command_inputs):
-
-        sheet_id = get_sheet_id()
 
         command.setDialogInitialSize(600, 800)
 
@@ -874,7 +945,13 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
         type_group.children.addBoolValueInput('sync_bom', 'Sync Design BOM?', True, '', True)
         type_group.children.addBoolValueInput('sync_features', 'Sync Design Feature Suppression?', True, '', True)
 
-        size_drop_down = build_sizes_dropdown(type_group.children, sheet_id)
+        spreadsheet_id = get_sheet_id()
+
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        self.value_ranges = value_ranges
+
+        size_drop_down = build_sizes_dropdown(command_inputs, value_ranges)
 
         type_group.isExpanded = False
 
@@ -936,14 +1013,14 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
         design = app_objects['design']
 
         # TODO add a 'current values' to top of list
-        index = input_values['Size_input'].selectedItem.index
+        row_id = input_values['Size_input'].selectedItem.index
 
-        sheet_id = get_sheet_id()
+        spreadsheet_id = get_sheet_id()
 
         if input_values['sync_direction'] == 'Push Design Data to Sheets':
 
             if input_values['sync_bom']:
-                create_sheet_bom(sheet_id)
+                create_sheet_bom(spreadsheet_id)
 
             if input_values['sync_parameters']:
                 # Todo add ability to push parameter and feature data
@@ -956,27 +1033,34 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
 
         elif input_values['sync_direction'] == 'Pull Sheets Data into Design':
 
+            value_ranges = self.value_ranges
+
             if input_values['sync_bom']:
-                items = get_parameters('BOM', sheet_id)
-                update_local_bom(items)
+                # items = get_parameters('BOM', sheet_id)
+                # update_local_bom(items)
+                bom_items = get_bom2(value_ranges)
+                update_local_bom(bom_items)
 
             if input_values['sync_parameters']:
-                items = get_parameters('Parameters', sheet_id)
+                # items = get_parameters('Parameters', sheet_id)
+                # update_local_parameters(items[index])
+                parameters = get_parameters2(value_ranges)
+                update_local_parameters(parameters[row_id])
 
-                update_local_parameters(items[index])
-
-                design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+                design.attributes.add('FusionSheeter', 'parameter_row_index', str(row_id))
 
             if input_values['sync_features']:
-                feature_list_of_lists = get_features('Features', sheet_id)
+                # feature_list_of_lists = get_features('Features', sheet_id)
+                # update_local_features(feature_list_of_lists[index])
+                features = get_features2(value_ranges)
+                update_local_features(features[row_id])
 
-                update_local_features(feature_list_of_lists[index])
-
-                design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+                design.attributes.add('FusionSheeter', 'parameter_row_index', str(row_id))
 
 
 # Command to create a new Google Sheet or link to an existing one
 class FusionSheeterCreateCommand(Fusion360CommandBase):
+
     # Update dialog based on user selections
     def on_input_changed(self, command_, command_inputs, changed_input, input_values):
 
@@ -1000,6 +1084,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
                 input_values['warning_input'].isVisible = True
             elif changed_input.selectedItem.name == 'User Parameters Only':
                 input_values['warning_input'].isVisible = False
+
     # Execute
     def on_execute(self, command, inputs, args, input_values):
 
@@ -1021,6 +1106,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
             create_sheet_parameters(new_id, all_params)
 
+            # Todo consolidate into less API calls.  Not critical
             create_sheet_bom(new_id)
 
             # Todo optional only renamed features?
@@ -1114,18 +1200,29 @@ class FusionSheeterBuildCommand(Fusion360CommandBase):
 
         document.save('Auto Saved by Fusion Sheeter')
 
-        sheet_id = get_sheet_id()
+        # sheet_id = get_sheet_id()
+        # sizes = get_parameters('Parameters', sheet_id)
+        # feature_list_of_lists = get_features('Features', sheet_id)
 
-        sizes = get_parameters('Parameters', sheet_id)
+        spreadsheet_id = get_sheet_id()
 
-        feature_list_of_lists = get_features('Features', sheet_id)
+        value_ranges = sheets_get2(spreadsheet_id)
 
-        for index, size in enumerate(sizes):
+        bom_items = get_bom2(value_ranges)
+        update_local_bom(bom_items)
 
-            update_local_parameters(size)
-            update_local_features(feature_list_of_lists[index])
+        parameters = get_parameters2(value_ranges)
+        features = get_features2(value_ranges)
 
-            design.attributes.add('FusionSheeter', 'parameter_row_index', str(index))
+        for i, size in enumerate(parameters):
+
+            # update_local_parameters(size)
+            # update_local_features(feature_list_of_lists[index])
+
+            update_local_parameters(parameters[i])
+            update_local_features(features[i])
+
+            design.attributes.add('FusionSheeter', 'parameter_row_index', str(i))
 
             document.saveAs(size['Description'], folder, 'Auto Generated by Fusion Sheeter', '')
 
@@ -1137,19 +1234,25 @@ class FusionSheeterExportCommand(Fusion360CommandBase):
     # Execute model creation
     def on_execute(self, command, inputs, args, input_values):
 
-        sheet_id = get_sheet_id()
-
-        sizes = get_parameters('Parameters', sheet_id)
-        feature_list_of_lists = get_features('Features', sheet_id)
-
         folder = input_values['output_folder']
         file_types = input_values['file_types_input'].listItems
         write_version = input_values['write_version']
 
-        for index, size in enumerate(sizes):
-            update_local_parameters(size)
-            update_local_features(feature_list_of_lists[index])
+        spreadsheet_id = get_sheet_id()
 
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        parameters = get_parameters2(value_ranges)
+        features = get_features2(value_ranges)
+
+        for index, size in enumerate(parameters):
+            # update_local_parameters(size)
+            # update_local_features(feature_list_of_lists[index])
+
+            update_local_parameters(parameters[index])
+            update_local_features(features[index])
+
+            # Todo handle naming
             export_active_doc(folder, file_types, write_version, index)
 
     def on_create(self, command, command_inputs):
@@ -1191,6 +1294,7 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
         global gcode_test
         global params_list
         global feature_list
+        global operation_collection
 
         operation_list.clear()
 
@@ -1203,16 +1307,30 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
         gcode_add_operations(input_values['folders'], operation_list)
         gcode_add_operations(input_values['operations'], operation_list)
 
+        operation_collection = build_op_collection(operation_list)
+
         gcode_index = 0
 
-        sheet_id = get_sheet_id()
-        params_list = get_parameters('Parameters', sheet_id)
-        feature_list = get_features('Features', sheet_id)
+        # sheet_id = get_sheet_id()
+        # params_list = get_parameters('Parameters', sheet_id)
+        # feature_list = get_features('Features', sheet_id)
+        # update_local_parameters(params_list[gcode_index])
+        # update_local_features(feature_list[gcode_index])
 
-        gcode_test = len(params_list)
+        spreadsheet_id = get_sheet_id()
 
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        # Populate global list of parameters to send to next command
+        params_list = get_parameters2(value_ranges)
+        feature_list = get_features2(value_ranges)
+
+        # Build 1st model size in list
         update_local_parameters(params_list[gcode_index])
         update_local_features(feature_list[gcode_index])
+
+        # Global to control iteration count
+        gcode_test = len(params_list)
 
         execute_next_command('cmdID_FusionSheeterGCodeCommand2')
 
@@ -1228,7 +1346,7 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
         default_dir = get_default_model_dir(app.activeDocument.name)
 
         # Check if the document has a CAMProductType. It will not if there are no CAM operations in it.
-        if product == None:
+        if product is None:
             ui.messageBox('There are no CAM operations in the active document')
             return
             # Cast the CAM product to a CAM object (a subtype of product).
@@ -1279,13 +1397,14 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
 class FusionSheeterGCodeCommand2(Fusion360CommandBase):
     # Update the G-Code
     def on_execute(self, command, inputs, args, input_values):
-        global operation_list
+        # global operation_list
         global post_name
         global output_folder
         global gcode_index
         global gcode_test
         global params_list
-        global feature_list
+        # global feature_list
+        global operation_collection
 
         switch_workspace('CAMEnvironment')
 
@@ -1295,8 +1414,13 @@ class FusionSheeterGCodeCommand2(Fusion360CommandBase):
 
         # Todo make this configurable
         prefix = params_list[gcode_index]['Part Number'] + '_' + params_list[gcode_index]['Description']
-        for operation in operation_list:
-            update_g_code(operation, post_name, output_folder, gcode_index, prefix)
+
+        # variable_message(prefix)
+
+        gcode_regen_tool_paths(operation_collection)
+
+        for operation in operation_collection:
+            g_code_post_operation(operation, post_name, output_folder, prefix)
 
         switch_workspace('FusionSolidEnvironment')
 
@@ -1325,10 +1449,9 @@ class FusionSheeterGCodeCommand3(Fusion360CommandBase):
         execute_next_command('cmdID_FusionSheeterGCodeCommand2')
 
 
-# Class for initial Model Definition and import.
+# Creates palette with sheet
 class FusionSheeterPaletteCommand(Fusion360CommandBase):
-    # Run when the user presses OK
-    # This is typically where your main program logic would go
+
     def on_execute(self, command, inputs, args, input_values):
 
         app = adsk.core.Application.get()
@@ -1346,7 +1469,7 @@ class FusionSheeterPaletteCommand(Fusion360CommandBase):
         if not palette:
             palette = ui.palettes.add(self.palette_id, 'Fusion Sheeter', url, True, True, True, 300, 300)
 
-            # Dock the palette to the right side of Fusion window.
+            # Dock the palette to the bottom of the Fusion window.
             palette.dockingState = adsk.core.PaletteDockingStates.PaletteDockStateBottom
             # # Add handler to HTMLEvent of the palette.
             # onHTMLEvent = MyHTMLEventHandler()

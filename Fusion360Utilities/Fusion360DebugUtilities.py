@@ -11,11 +11,27 @@ import traceback
 
 # Print a list of list of variables
 # Format of variables should be [[Variable name 1, variable value 1], [Variable name 2, variable value 2], ...]
-def variable_message(variables):
+def variables_message(variables: list):
 
     message_string = ''
     for variable in variables:
         message_string += variable[0] + ' = ' + str(variable[1]) + '\n'
+
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+
+    if ui:
+        ui.messageBox(message_string)
+
+
+def variable_message(variable, extra_info=''):
+
+    message_string = str(variable)
+
+    if len(extra_info) > 0:
+        message_string += '   :   '
+
+        message_string += extra_info
 
     app = adsk.core.Application.get()
     ui = app.userInterface
