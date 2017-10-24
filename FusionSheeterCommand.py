@@ -1287,6 +1287,12 @@ class FusionSheeterOpenSheetCommand(Fusion360CommandBase):
 class FusionSheeterGCodeCommand(Fusion360CommandBase):
     # This is typically where your main program logic would go
     def on_execute(self, command, inputs, args, input_values):
+
+        # ******* BUG ************
+        
+        return
+        # ******* BUG ************
+
         global operation_list
         global post_name
         global output_folder
@@ -1336,6 +1342,15 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
 
     # Creates a dialog UI
     def on_create(self, command, command_inputs):
+
+        # ******* BUG ************
+        app = adsk.core.Application.get()
+        ui = app.userInterface
+        ui.messageBox('So sorry, there is an issue with g-code export in the current version of Fusion 360.  '
+                      'Estimated fix on Oct 27')
+        adsk.terminate()
+        return
+        # ******* BUG ************
 
         app = adsk.core.Application.get()
         ui = app.userInterface
