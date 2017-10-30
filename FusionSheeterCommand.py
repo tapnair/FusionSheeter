@@ -1290,7 +1290,7 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
 
         # ******* BUG ************
         
-        return
+        # return
         # ******* BUG ************
 
         global operation_list
@@ -1344,12 +1344,12 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
     def on_create(self, command, command_inputs):
 
         # ******* BUG ************
-        app = adsk.core.Application.get()
-        ui = app.userInterface
-        ui.messageBox('So sorry, there is an issue with g-code export in the current version of Fusion 360.  '
-                      'Estimated fix on Oct 27')
-        adsk.terminate()
-        return
+        # app = adsk.core.Application.get()
+        # ui = app.userInterface
+        # ui.messageBox('So sorry, there is an issue with g-code export in the current version of Fusion 360.  '
+        #               'Estimated fix on Oct 27')
+        # adsk.terminate()
+        # return
         # ******* BUG ************
 
         app = adsk.core.Application.get()
