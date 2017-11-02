@@ -147,6 +147,36 @@ def sheets_update(sheet_id, sheet_range, range_body):
     response = request.execute()
 
 
+def push_parameters(parameter_matrix, row_id, spreadsheet_id, all_params=False):
+
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+
+    design = app_objects['design']
+
+    if all_params:
+        parameters = design.allParameters
+    else:
+        parameters = design.userParameters
+
+    for parameter in parameters:
+
+        try:
+            index = parameter_matrix[0].index(parameter.name)
+            parameter_matrix[row_id][index] = um.formatInternalValue(parameter.value, parameter.unit, False)
+        except ValueError:
+            parameter_matrix[0].append(parameter.name)
+            for i in range(1, len(parameter_matrix)):
+                parameter_matrix[i].append(um.formatInternalValue(parameter.value, parameter.unit, False))
+
+    range_body = {"range": "Parameters",
+                  "values": parameter_matrix}
+
+    sheet_range = 'Parameters'
+
+    sheets_update(spreadsheet_id, sheet_range, range_body)
+
+
 def get_parameters(range_name, spreadsheet_id):
 
     result = sheets_get(spreadsheet_id, range_name)
@@ -173,6 +203,13 @@ def get_parameters2(value_ranges):
         dict_list.append(row_dict)
 
     return dict_list
+
+
+def get_parameters_matrix(value_ranges):
+
+    parameter_matrix = value_ranges[0].get('values', [])
+
+    return parameter_matrix
 
 
 def get_bom2(value_ranges):
@@ -315,15 +352,15 @@ def update_local_features(feature_list):
             elif new_state[1] == 'Suppressed' and not time_line_object.isSuppressed:
                 time_line_object.isSuppressed = True
 
-    # Update Meta Data
-    # TODO probably remove this from here
-    new_number = find_list_item(feature_list, 'Part Number')
-    if new_number is not None:
-        design.rootComponent.partNumber = new_number[1]
-
-    new_description = find_list_item(feature_list, 'Description')
-    if new_description is not None:
-        design.rootComponent.description = new_description[1]
+    # # Update Meta Data
+    # # TODO probably remove this from here
+    # new_number = find_list_item(feature_list, 'Part Number')
+    # if new_number is not None:
+    #     design.rootComponent.partNumber = new_number[1]
+    #
+    # new_description = find_list_item(feature_list, 'Description')
+    # if new_description is not None:
+    #     design.rootComponent.description = new_description[1]
 
         # Todo create and display change list (not during size change, need variable to control)
 
@@ -567,7 +604,10 @@ def get_time_line_object_name(time_line_object):
     except:
         pass
 
-    feature_name += time_line_object.name
+    try:
+        feature_name += time_line_object.name
+    except:
+        feature_name += 'No Name'
 
     return feature_name
 
@@ -979,8 +1019,8 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
             if changed_input.selectedItem.name == 'Push Design Data to Sheets':
 
                 # TODO when get push working remove these
-                command_inputs.itemById('sync_parameters').value = False
-                command_inputs.itemById('sync_parameters').isEnabled = False
+                # command_inputs.itemById('sync_parameters').value = False
+                # command_inputs.itemById('sync_parameters').isEnabled = False
                 command_inputs.itemById('sync_features').value = False
                 command_inputs.itemById('sync_features').isEnabled = False
 
@@ -989,14 +1029,14 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
                 command_inputs.itemById('warning_input').isVisible = True
 
                 # TODO when get push working set these to True
-                command_inputs.itemById('new_existing_title').isVisible = False
-                command_inputs.itemById('new_existing').isVisible = False
+                command_inputs.itemById('new_existing_title').isVisible = True
+                command_inputs.itemById('new_existing').isVisible = True
 
             elif changed_input.selectedItem.name == 'Pull Sheets Data into Design':
 
                 # TODO when get push working remove these
-                command_inputs.itemById('sync_parameters').value = True
-                command_inputs.itemById('sync_parameters').isEnabled = True
+                # command_inputs.itemById('sync_parameters').value = True
+                # command_inputs.itemById('sync_parameters').isEnabled = True
                 command_inputs.itemById('sync_features').value = True
                 command_inputs.itemById('sync_features').isEnabled = True
 
@@ -1012,28 +1052,45 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
         app_objects = get_app_objects()
         design = app_objects['design']
 
-        # TODO add a 'current values' to top of list
-        row_id = input_values['Size_input'].selectedItem.index
-
         spreadsheet_id = get_sheet_id()
+        value_ranges = self.value_ranges
 
         if input_values['sync_direction'] == 'Push Design Data to Sheets':
+
+            row_id = get_row_id()
 
             if input_values['sync_bom']:
                 create_sheet_bom(spreadsheet_id)
 
             if input_values['sync_parameters']:
-                # Todo add ability to push parameter and feature data
-                # Todo handle create new vs. update existing
-                #
-                pass
+
+                parameter_matrix = get_parameters_matrix(value_ranges)
+
+                if input_values['new_existing'] == 'Create New Size?':
+                    row_index = len(parameter_matrix)
+                    parameter_matrix.append([None]*len(parameter_matrix[0]))
+
+                    number_index = parameter_matrix[0].index('Part Number')
+                    parameter_matrix[-1][number_index] = design.rootComponent.partNumber
+
+                    description_index = parameter_matrix[0].index('Description')
+                    parameter_matrix[-1][description_index] = design.rootComponent.description
+
+                    design.attributes.add('FusionSheeter', 'parameter_row_index', str(row_index-1))
+
+                else:
+                    row_index = row_id + 1
+
+                push_parameters(parameter_matrix, row_index, spreadsheet_id)
 
             if input_values['sync_features']:
+                # TODO add features push
                 pass
 
         elif input_values['sync_direction'] == 'Pull Sheets Data into Design':
 
-            value_ranges = self.value_ranges
+            # TODO add a 'current values' to top of list
+            row_id = input_values['Size_input'].selectedItem.index
 
             if input_values['sync_bom']:
                 # items = get_parameters('BOM', sheet_id)
@@ -1105,6 +1162,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             new_id = spreadsheet['spreadsheetId']
 
             create_sheet_parameters(new_id, all_params)
+            design.attributes.add('FusionSheeter', 'parameter_row_index', str(0))
 
             # Todo consolidate into less API calls.  Not critical
             create_sheet_bom(new_id)
@@ -1511,12 +1569,12 @@ class FusionSheeterQuickPullCommand(Fusion360CommandBase):
 
         value_ranges = sheets_get2(spreadsheet_id)
 
-        bom_items = get_bom2(value_ranges)
-        update_local_bom(bom_items)
+        # bom_items = get_bom2(value_ranges)
+        # update_local_bom(bom_items)
 
         parameters = get_parameters2(value_ranges)
         update_local_parameters(parameters[row_id])
 
-        features = get_features2(value_ranges)
-        update_local_features(features[row_id])
+        # features = get_features2(value_ranges)
+        # update_local_features(features[row_id])
 
