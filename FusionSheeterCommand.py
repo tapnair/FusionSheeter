@@ -191,7 +191,7 @@ def get_parameters(range_name, spreadsheet_id):
 
     return dict_list
 
-
+# TODO dangerous now based on magic index to list of ranges
 def get_parameters2(value_ranges):
 
     rows = value_ranges[0].get('values', [])
@@ -1347,7 +1347,7 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
     def on_execute(self, command, inputs, args, input_values):
 
         # ******* BUG ************
-        
+
         # return
         # ******* BUG ************
 
@@ -1577,4 +1577,3 @@ class FusionSheeterQuickPullCommand(Fusion360CommandBase):
 
         # features = get_features2(value_ranges)
         # update_local_features(features[row_id])
-

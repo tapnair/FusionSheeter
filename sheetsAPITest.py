@@ -22,7 +22,7 @@ except ImportError:
 SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Sheets API Python Quickstart'
-
+# APPLICATION_NAME = 'FusionPlugin'
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -38,7 +38,8 @@ def get_credentials():
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
-                                   'sheets.googleapis.com-python-quickstart.json')
+                                   # 'sheets.googleapis.com-python-quickstart.json')
+                                   'fusion-bolter.json')
 
     store = Storage(credential_path)
     credentials = store.get()
@@ -66,10 +67,13 @@ def main():
     service = discovery.build('sheets', 'v4', http=http,
                               discoveryServiceUrl=discoveryUrl)
 
-    spreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
-    rangeName = 'Class Data!A2:E'
-    result = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheetId, range=rangeName).execute()
+    # spreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
+    spreadsheetId = '1csJofpAG3oD204rxkVoYzI5WGjvrMeWsaq2oe2J7hig'
+    # spreadsheetId = '15KCsLsmhSS4xua1IMYFlZKjn_cHHiUB6Ya6Qj8Mr8bc'
+    rangeName = 'Master'
+    # rangeName = 'Class Data!A2:E'
+    # result = service.spreadsheets().get(spreadsheetId=spreadsheetId).execute()
+    result = service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=rangeName).execute()
     values = result.get('values', [])
 
     if not values:
