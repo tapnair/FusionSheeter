@@ -2,6 +2,8 @@
 
 Connect a Fusion 360 design to Google Sheets
 
+NOTE: This sample is provided "As-is" with no guarantee of performance, reliability or warranty.
+
 ![Sheeter Cover](./resources/readMeCover.png)
 
 
@@ -15,6 +17,8 @@ After downloading the zip file follow the [installation instructions here](https
 # Usage
 
 Documentation to come later. For now:
+
+See a video here: https://youtu.be/dwWDpQSrz7o
 
 There are 3 tabs (sheets) in the Sheets Document:
 - Parameters
@@ -73,8 +77,7 @@ There are 3 tabs (sheets) in the Sheets Document:
 - Each size in the sheet will be exported
 
 # TODO / Enhancements:
-- Generate all models in sizes sheet
-- Ability to sync current design without selecting new size
+- Push changes to time line to feature sheet
 - Drop downs for post names in G Code
 
 ## License
