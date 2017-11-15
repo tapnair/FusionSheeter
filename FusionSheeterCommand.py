@@ -931,8 +931,8 @@ class FusionSheeterSizeCommand(Fusion360CommandBase):
 
         value_ranges = self.value_ranges
 
-        bom_items = get_bom2(value_ranges)
-        update_local_bom(bom_items)
+        # bom_items = get_bom2(value_ranges)
+        # update_local_bom(bom_items)
 
         parameters = get_parameters2(value_ranges)
         update_local_parameters(parameters[index])
