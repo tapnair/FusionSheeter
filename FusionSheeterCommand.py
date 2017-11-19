@@ -123,7 +123,7 @@ def sheets_get(spreadsheet_id, range_name):
 # Get Values from a sheet
 def sheets_get2(spreadsheet_id):
 
-    sheet_ranges = ['Parameters', 'BOM', 'Features']
+    sheet_ranges = ['Parameters', 'BOM', 'Features', 'Display']
     service = get_sheets_service()
     response = service.spreadsheets().values().batchGet(spreadsheetId=spreadsheet_id, ranges=sheet_ranges).execute()
 
@@ -195,6 +195,20 @@ def get_parameters(range_name, spreadsheet_id):
 def get_parameters2(value_ranges):
 
     rows = value_ranges[0].get('values', [])
+
+    dict_list = []
+
+    for row in rows[1:]:
+        row_dict = dict(zip(rows[0], row))
+        dict_list.append(row_dict)
+
+    return dict_list
+
+
+# TODO dangerous now based on magic index to list of ranges
+def get_display(value_ranges):
+
+    rows = value_ranges[3].get('values', [])
 
     dict_list = []
 
@@ -285,6 +299,21 @@ def get_row_id():
     return int(row_id)
 
 
+def get_display_row_id():
+    app_objects = get_app_objects()
+    ui = app_objects['ui']
+    design = app_objects['design']
+
+    display_row_id_attribute = design.attributes.itemByName('FusionSheeter', 'display_row_index')
+
+    if display_row_id_attribute:
+        row_id = display_row_id_attribute.value
+    else:
+        return 0
+
+    return int(row_id)
+
+
 def update_local_parameters(size):
     app_objects = get_app_objects()
     um = app_objects['units_manager']
@@ -324,7 +353,7 @@ def update_local_parameters(size):
 
 
 # Update local feature suppression state from sheets data
-def update_local_features(feature_list):
+def update_local_features(feature_list_input):
     app_objects = get_app_objects()
     design = app_objects['design']
 
@@ -332,7 +361,7 @@ def update_local_features(feature_list):
     time_line = design.timeline
 
     # Going to iterate time line in reverse
-    feature_list = list(reversed(feature_list))
+    reverse_feature_list = list(reversed(feature_list_input))
 
     # Walk timeline in reverse order
     for index in reversed(range(time_line.count)):
@@ -341,7 +370,7 @@ def update_local_features(feature_list):
 
         feature_name = get_time_line_object_name(time_line_object)
 
-        new_state = find_list_item(feature_list, feature_name)
+        new_state = find_list_item(reverse_feature_list, feature_name)
 
         # Set suppression state from sheet if different than current
         if new_state is not None:
@@ -366,12 +395,31 @@ def update_local_features(feature_list):
 
 
 # Search sheets feature list for item pops it from list
-def find_list_item(feature_list, name):
-    for index, feature in enumerate(feature_list):
+def find_list_item(feature_list_input, name):
+    for index, feature in enumerate(feature_list_input):
         if feature[0] == name:
             return feature_list.pop(index)
 
     return None
+
+
+def update_local_display(display_capture):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+
+    design = app_objects['design']
+
+    all_occurrences = design.rootComponent.allOccurrences
+
+    for occurrence in all_occurrences:
+
+        new_value = display_capture.get(occurrence.fullPathName)
+
+        if new_value is not None:
+            if new_value == 'TRUE':
+                occurrence.isLightBulbOn = True
+            elif new_value == 'FALSE':
+                occurrence.isLightBulbOn = False
 
 
 # Create new Google Sheet
@@ -404,6 +452,14 @@ def sheets_create(name):
             {
                 "properties": {
                     "title": 'Features',
+                    'gridProperties': {
+                        "frozenRowCount": 1
+                    }
+                }
+            },
+            {
+                "properties": {
+                    "title": 'Display',
                     'gridProperties': {
                         "frozenRowCount": 1
                     }
@@ -494,6 +550,21 @@ def sheets_add_protected_ranges(spreadsheet):
 
                 }
             }
+        },
+        {
+            "addProtectedRange": {
+                'protectedRange': {
+                    "range": {
+                        "sheetId": sheet_ids['Display'],
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                        "startColumnIndex": 0
+                    },
+                    "description": "Headers must match Component names in Fusion 360",
+                    "warningOnly": True
+
+                }
+            }
         }
 
     ]
@@ -571,7 +642,7 @@ def create_sheet_suppression(sheet_id, all_features):
         else:
             state = 'Unsuppressed'
 
-            feature_name = get_time_line_object_name(time_line_object)
+        feature_name = get_time_line_object_name(time_line_object)
 
         headers.append(feature_name)
         dims.append(state)
@@ -588,7 +659,6 @@ def create_sheet_suppression(sheet_id, all_features):
     sheet_range = 'Features'
 
     sheets_update(sheet_id, sheet_range, range_body)
-
 
 
 # Create Unique name for time line objects
@@ -610,6 +680,29 @@ def get_time_line_object_name(time_line_object):
         feature_name += 'No Name'
 
     return feature_name
+
+
+# Create display sheet
+def create_sheet_display(sheet_id):
+    app_objects = get_app_objects()
+    design = app_objects['design']
+
+    headers = []
+    dims = []
+
+    headers.append('Display Name')
+    dims.append(design.rootComponent.partNumber)
+
+    for occurrence in design.rootComponent.allOccurrences:
+        headers.append(occurrence.fullPathName)
+        dims.append(str(occurrence.isLightBulbOn))
+
+    range_body = {"range": "Display",
+                  "values": [headers, dims]}
+
+    sheet_range = 'Display'
+
+    sheets_update(sheet_id, sheet_range, range_body)
 
 
 # Create BOM Sheet from Current design Assembly
@@ -721,6 +814,24 @@ def build_sizes_dropdown(command_inputs, value_ranges):
     size_drop_down.listItems.item(row_id).isSelected = True
 
     return size_drop_down
+
+
+# Create a dropdown based on descriptions on Parameters page
+def build_display_dropdown(command_inputs, value_ranges, name):
+
+    display_captures = get_display(value_ranges)
+
+    display_drop_down = command_inputs.addDropDownCommandInput(name, 'Current Display Capture (Associated Sheet Row)',
+                                                            adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+
+    for capture in display_captures:
+        display_drop_down.listItems.add(capture['Display Name'], False)
+
+    row_id = get_display_row_id()
+
+    display_drop_down.listItems.item(row_id).isSelected = True
+
+    return display_drop_down
 
 
 def gcode_regen_tool_paths(operation_collection_):
@@ -963,6 +1074,42 @@ class FusionSheeterSizeCommand(Fusion360CommandBase):
         size_drop_down = build_sizes_dropdown(command_inputs, value_ranges)
 
 
+# Switch current design to a different size
+class FusionSheeterDisplayCommand(Fusion360CommandBase):
+
+    def __init__(self, cmd_def, debug):
+        super().__init__(cmd_def, debug)
+        self.value_ranges = []
+
+    # All size changes done during preview.  Ok commits switch
+    def on_preview(self, command, inputs, args, input_values):
+
+        app_objects = get_app_objects()
+        design = app_objects['design']
+
+        # TODO add a 'current values' to top of list
+        index = inputs.itemById('display_input').selectedItem.index
+
+        value_ranges = self.value_ranges
+
+        display_captures = get_display(value_ranges)
+        update_local_display(display_captures[index])
+
+        design.attributes.add('FusionSheeter', 'display_row_index', str(index))
+
+        args.isValidResult = True
+
+    def on_create(self, command, command_inputs):
+
+        spreadsheet_id = get_sheet_id()
+
+        value_ranges = sheets_get2(spreadsheet_id)
+
+        self.value_ranges = value_ranges
+
+        build_display_dropdown(command_inputs, value_ranges, 'display_input')
+
+
 class FusionSheeterSyncCommand(Fusion360CommandBase):
 
     def __init__(self, cmd_def, debug):
@@ -1170,6 +1317,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             # Todo optional only renamed features?
             create_sheet_suppression(new_id, True)
 
+            create_sheet_display(new_id)
+
             sheets_add_protected_ranges(spreadsheet)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
@@ -1183,6 +1332,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
         design.attributes.add('FusionSheeter', 'spreadsheetId', new_id)
         design.attributes.add('FusionSheeter', 'parameter_row_index', '0')
+        design.attributes.add('FusionSheeter', 'display_row_index', '0')
 
         url = 'https://docs.google.com/spreadsheets/d/%s/edit#gid=0' % new_id
 

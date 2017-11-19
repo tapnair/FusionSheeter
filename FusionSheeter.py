@@ -3,7 +3,7 @@
 from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
     FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, \
     FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand, \
-    FusionSheeterPaletteCommand, FusionSheeterQuickPullCommand
+    FusionSheeterPaletteCommand, FusionSheeterQuickPullCommand, FusionSheeterDisplayCommand
 
 commands = []
 command_definitions = []
@@ -70,8 +70,21 @@ cmd = {
     'cmd_resources': './resources',
     'workspace': 'FusionSolidEnvironment',
     'toolbar_panel_id': 'Sheeter',
-    'add_separator': True,
+    'add_separator': False,
     'class': FusionSheeterSizeCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Change Display',
+    'cmd_description': 'Change Saved Display Capture',
+    'cmd_id': 'cmdID_FusionSheeterDisplayCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'add_separator': True,
+    'class': FusionSheeterDisplayCommand
 }
 command_definitions.append(cmd)
 
@@ -139,9 +152,6 @@ cmd = {
     'class': FusionSheeterExportCommand
 }
 command_definitions.append(cmd)
-
-
-
 
 # Define parameters for 1st command
 cmd = {
