@@ -398,7 +398,7 @@ def update_local_features(feature_list_input):
 def find_list_item(feature_list_input, name):
     for index, feature in enumerate(feature_list_input):
         if feature[0] == name:
-            return feature_list.pop(index)
+            return feature_list_input.pop(index)
 
     return None
 
