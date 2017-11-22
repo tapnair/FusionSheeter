@@ -1,9 +1,12 @@
-# Importing sample Fusion Command
-# Could import multiple Command definitions here
+
 from .FusionSheeterCommand import FusionSheeterSizeCommand, FusionSheeterCreateCommand, \
-    FusionSheeterBuildCommand, FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, \
-    FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, FusionSheeterGCodeCommand3, FusionSheeterExportCommand, \
-    FusionSheeterPaletteCommand, FusionSheeterQuickPullCommand, FusionSheeterDisplayCommand
+    FusionSheeterSyncCommand, FusionSheeterOpenSheetCommand, FusionSheeterPaletteCommand, \
+    FusionSheeterQuickPullCommand, FusionSheeterDisplayCommand, FusionSheeterDisplayCreateCommand
+
+from .FusionSheeterExportCommands import FusionSheeterBuildCommand, FusionSheeterExportCommand
+
+from .FusionSheeterGCodeCommands import FusionSheeterGCodeCommand, FusionSheeterGCodeCommand2, \
+    FusionSheeterGCodeCommand3
 
 commands = []
 command_definitions = []
@@ -83,8 +86,21 @@ cmd = {
     'cmd_resources': './resources',
     'workspace': 'FusionSolidEnvironment',
     'toolbar_panel_id': 'Sheeter',
-    'add_separator': True,
+    'add_separator': False,
     'class': FusionSheeterDisplayCommand
+}
+command_definitions.append(cmd)
+
+# Define parameters for command
+cmd = {
+    'cmd_name': 'Capture Current Display',
+    'cmd_description': 'Capture the hide/show state of all COMPONENTS',
+    'cmd_id': 'cmdID_FusionSheeterDisplayCreateCommand',
+    'cmd_resources': './resources',
+    'workspace': 'FusionSolidEnvironment',
+    'toolbar_panel_id': 'Sheeter',
+    'add_separator': True,
+    'class': FusionSheeterDisplayCreateCommand
 }
 command_definitions.append(cmd)
 

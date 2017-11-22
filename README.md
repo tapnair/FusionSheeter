@@ -15,12 +15,13 @@ After downloading the zip file follow the [installation instructions here](https
 
 
 # Usage
+![Sheeter Icon](./resources/master/F-Sheets.png)
 
 Documentation to come later. For now:
 
 See a video here: https://youtu.be/dwWDpQSrz7o
 
-There are 3 tabs (sheets) in the Sheets Document:
+There are 4 tabs (sheets) in the Sheets Document:
 - Parameters
     - Header row defines parameter name in Fusion design
 - BOM
@@ -32,7 +33,10 @@ There are 3 tabs (sheets) in the Sheets Document:
     - Note this is still a work in progress and may not always be reliable.
     - The biggest limitation is that if you add new features they cannot automatically be added to the sheet yet.
     - To add new features you need to add a column to the sheet that matches the feature name in the time line
-
+- Display
+    - You can create different sets of displayed/hidden combinations here
+    - All parts should be listed in the header (with their 'full path' including parent and occurrence number
+    - *Note if you were using an older version of Sheeter you may not have this tab*
 
 ![Sheeter Menu](./resources/readMeMenu.png)
 
@@ -61,6 +65,17 @@ There are 3 tabs (sheets) in the Sheets Document:
 - At any given time, the current design is 'associated' to a row in the sheet.
 - To change the associated row use this command to select another size
 - The values you see in the drop down are driven from the 'Description' field
+
+### Change Display
+- At any given time, the current design is 'associated' to a row in the Display sheet.
+- To change the associated row use this command to select another display configuration
+- *Note if you were using an older version of Sheeter you may not have this tab*
+
+### Capture Current Display
+- This will capture the current hide/show state of all 'occurrences'
+- Note: Hidden BODIES are not affected by this command
+- You can create a new capture (row in the sheet) or update the existing one
+- Also note the values in the spreadsheet are case sensitive TRUE and FALSE
 
 ### Generate G Code for all sizes
 - Will generate output nc code for all sizes in the associated Google Sheet
