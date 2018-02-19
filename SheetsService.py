@@ -100,8 +100,8 @@ def sheets_get_range(spreadsheet_id, range_name):
 def sheets_get_ranges(spreadsheet_id, sheet_ranges):
     """ Returns a Value Ranges for the input ranges.
     
-    See Sheets API Documnetation for rangee syntax
-    Sample: ['Sheet1', 'Sheet2] returns all values on these sheets
+    See Sheets API Documnetation for ranges syntax
+    Sample: ['Sheet1', 'Sheet2'] returns all values on these sheets
     
     """
     service = get_sheets_service()

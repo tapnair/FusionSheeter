@@ -11,7 +11,8 @@ from .SheeterModelUtilities import push_parameters, get_parameters2, get_display
     get_parameters_matrix, get_features2, update_local_parameters, update_local_features, \
     update_local_display, get_time_line_object_name, get_display_matrix, push_display
 
-from .SheeterBOMUtilities import bom_map_to_sheet_array, get_bom2, bom_builder, update_local_bom
+from .SheeterBOMUtilities import bom_map_to_sheet_array, get_bom2, bom_builder, update_local_bom, get_bom_adv, \
+    update_local_bom_adv
 
 import webbrowser
 
@@ -20,7 +21,6 @@ from collections import defaultdict
 
 # Create new Google Sheet
 def sheets_create(name):
-
     spreadsheet_body = {
         "properties": {
             "title": name
@@ -60,6 +60,14 @@ def sheets_create(name):
                         "frozenRowCount": 1
                     }
                 }
+            },
+            {
+                "properties": {
+                    "title": 'BOM-ADV',
+                    'gridProperties': {
+                        "frozenRowCount": 1
+                    }
+                }
             }
         ]
     }
@@ -70,6 +78,65 @@ def sheets_create(name):
 
     return spreadsheet_response
 
+
+def add_bom_part_sheet(spreadsheet, components):
+    service = get_sheets_service()
+
+    requests = []
+    data = []
+
+    for component in components:
+        component_sheet = {
+            "addSheet": {
+                "properties": {
+                    "title": 'BOM-' + component.name,
+                    'gridProperties': {
+                        "frozenRowCount": 1
+                    }
+                }
+
+            }
+        }
+
+        requests.append(component_sheet)
+
+        headers = []
+        dims = []
+
+        headers.append('Part Number')
+        dims.append(component.partNumber)
+
+        headers.append('Description')
+        dims.append(component.description)
+
+        range_body = {
+            "range": 'BOM-' + component.name,
+            "values": [headers, dims]
+        }
+
+        # TODO add some dims somehow?
+        data.append(range_body)
+
+    # Create the component sheets
+    create_component_sheets_body = {
+        'requests': requests
+    }
+    response = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet['spreadsheetId'],
+                                                  body=create_component_sheets_body).execute()
+
+    # Add the values to the component sheets
+    batch_update_values_request_body = {
+        # How the input data should be interpreted.
+        'value_input_option': 'USER_ENTERED',
+        'data': data
+
+    }
+    response = service.spreadsheets().values().batchUpdate(spreadsheetId=spreadsheet['spreadsheetId'],
+                                                           body=batch_update_values_request_body).execute()
+
+    # TODO make dropdowns
+    # https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#SetDataValidationRequest
+    
 
 # Not currently working for some reason
 def sheets_add_protected_ranges(spreadsheet):
@@ -152,6 +219,21 @@ def sheets_add_protected_ranges(spreadsheet):
                 'protectedRange': {
                     "range": {
                         "sheetId": sheet_ids['Display'],
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                        "startColumnIndex": 0
+                    },
+                    "description": "Headers must match Component Occurrence names in Fusion 360",
+                    "warningOnly": True
+
+                }
+            }
+        },
+        {
+            "addProtectedRange": {
+                'protectedRange': {
+                    "range": {
+                        "sheetId": sheet_ids['BOM-ADV'],
                         "startRowIndex": 0,
                         "endRowIndex": 1,
                         "startColumnIndex": 0
@@ -257,7 +339,6 @@ def create_sheet_suppression(sheet_id, all_features):
     sheets_update_values(sheet_id, sheet_range, range_body)
 
 
-
 # Create display sheet
 def create_sheet_display(sheet_id):
     app_objects = get_app_objects()
@@ -309,11 +390,43 @@ def create_sheet_bom(sheet_id):
     sheets_update_values(sheet_id, sheet_range, range_body)
 
 
+# Create BOM Sheet from Current design Assembly
+# Also called during push update (overwrites everything)
+def create_sheet_bom_adv(sheet_id):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+    design = app_objects['design']
+    ui = app_objects['ui']
+
+    headers = []
+    dims = []
+
+    headers.append('Part Number')
+    headers.append('Description')
+
+    dims.append('=Parameters!A2')
+    dims.append('=Parameters!B2')
+
+    for component in design.allComponents[:-1]:
+        headers.append(component.name)
+        dims.append(str(component.partNumber))
+
+    values = [headers, dims]
+
+    # Create Link to Parameters Sheet
+    for i in range(3, 100):
+        values.append(['=Parameters!A%i' % i, '=Parameters!B%i' % i])
+
+    range_body = {"range": "BOM-ADV",
+                  "values": values}
+
+    sheet_range = 'BOM-ADV'
+
+    sheets_update_values(sheet_id, sheet_range, range_body)
 
 
 # Create a dropdown based on descriptions on Parameters page
 def build_sizes_dropdown(command_inputs, value_ranges):
-
     # sizes = get_parameters('Parameters', sheet_id)
 
     parameters = get_parameters2(value_ranges)
@@ -333,11 +446,10 @@ def build_sizes_dropdown(command_inputs, value_ranges):
 
 # Create a dropdown based on descriptions on Parameters page
 def build_display_dropdown(command_inputs, value_ranges, name):
-
     display_captures = get_display(value_ranges)
 
     display_drop_down = command_inputs.addDropDownCommandInput(name, 'Current Display Capture (Associated Sheet Row)',
-                                                            adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+                                                               adsk.core.DropDownStyles.LabeledIconDropDownStyle)
 
     for capture in display_captures:
         display_drop_down.listItems.add(capture['Display Name'], False)
@@ -351,14 +463,12 @@ def build_display_dropdown(command_inputs, value_ranges, name):
 
 # Switch current design to a different size
 class FusionSheeterSizeCommand(Fusion360CommandBase):
-
     def __init__(self, cmd_def, debug):
         super().__init__(cmd_def, debug)
         self.value_ranges = []
 
     # All size changes done during preview.  Ok commits switch
     def on_preview(self, command, inputs, args, input_values):
-
         app_objects = get_app_objects()
         design = app_objects['design']
 
@@ -382,7 +492,6 @@ class FusionSheeterSizeCommand(Fusion360CommandBase):
         args.isValidResult = True
 
     def on_create(self, command, command_inputs):
-
         spreadsheet_id = get_sheet_id()
 
         value_ranges = sheets_get_ranges(spreadsheet_id, ['Parameters', 'Features'])
@@ -394,14 +503,12 @@ class FusionSheeterSizeCommand(Fusion360CommandBase):
 
 # Switch current design to a different size
 class FusionSheeterDisplayCommand(Fusion360CommandBase):
-
     def __init__(self, cmd_def, debug):
         super().__init__(cmd_def, debug)
         self.value_ranges = []
 
     # All size changes done during preview.  Ok commits switch
     def on_preview(self, command, inputs, args, input_values):
-
         app_objects = get_app_objects()
         design = app_objects['design']
 
@@ -418,7 +525,6 @@ class FusionSheeterDisplayCommand(Fusion360CommandBase):
         args.isValidResult = True
 
     def on_create(self, command, command_inputs):
-
         spreadsheet_id = get_sheet_id()
 
         # value_ranges = sheets_get2(spreadsheet_id)
@@ -431,7 +537,6 @@ class FusionSheeterDisplayCommand(Fusion360CommandBase):
 
 # Switch current design to a different size
 class FusionSheeterDisplayCreateCommand(Fusion360CommandBase):
-
     def on_execute(self, command, inputs, args, input_values):
 
         app_objects = get_app_objects()
@@ -460,7 +565,8 @@ class FusionSheeterDisplayCreateCommand(Fusion360CommandBase):
 
     def on_create(self, command, command_inputs):
         new_existing_title = command_inputs.addTextBoxCommandInput('new_existing_title', '',
-                                                                   '<b>Update Existing Display Capture or Create New one? </b>', 1, True)
+                                                                   '<b>Update Existing Display Capture or Create New one? </b>',
+                                                                   1, True)
 
         new_existing_option = command_inputs.addRadioButtonGroupCommandInput('new_existing')
         new_existing_option.listItems.add('Create New Display Capture?', True)
@@ -476,8 +582,8 @@ class FusionSheeterDisplayCreateCommand(Fusion360CommandBase):
             else:
                 command_inputs.itemById('new_name').isVisible = False
 
-class FusionSheeterSyncCommand(Fusion360CommandBase):
 
+class FusionSheeterSyncCommand(Fusion360CommandBase):
     def __init__(self, cmd_def, debug):
         super().__init__(cmd_def, debug)
         self.value_ranges = []
@@ -501,7 +607,7 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
         spreadsheet_id = get_sheet_id()
 
         # value_ranges = sheets_get2(spreadsheet_id)
-        value_ranges = sheets_get_ranges(spreadsheet_id, ['Parameters', 'BOM', 'Features'])
+        value_ranges = sheets_get_ranges(spreadsheet_id, ['Parameters', 'BOM', 'Features', 'BOM-ADV'])
 
         self.value_ranges = value_ranges
 
@@ -583,7 +689,7 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
 
                 if input_values['new_existing'] == 'Create New Size?':
                     row_index = len(parameter_matrix)
-                    parameter_matrix.append([None]*len(parameter_matrix[0]))
+                    parameter_matrix.append([None] * len(parameter_matrix[0]))
 
                     number_index = parameter_matrix[0].index('Part Number')
                     parameter_matrix[-1][number_index] = design.rootComponent.partNumber
@@ -591,7 +697,7 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
                     description_index = parameter_matrix[0].index('Description')
                     parameter_matrix[-1][description_index] = design.rootComponent.description
 
-                    design.attributes.add('FusionSheeter', 'parameter_row_index', str(row_index-1))
+                    design.attributes.add('FusionSheeter', 'parameter_row_index', str(row_index - 1))
 
                 else:
                     row_index = row_id + 1
@@ -608,11 +714,16 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
             row_id = input_values['Size_input'].selectedItem.index
 
             if input_values['sync_bom']:
-                # items = get_parameters('BOM', sheet_id)
-                # update_local_bom(items)
-                bom_items = get_bom2(value_ranges)
+
+                # TODO Making changes here for BOM Branch
+                # bom_items = get_bom2(value_ranges)
+                # all_components = design.allComponents
+                # change_list = update_local_bom(bom_items, all_components)
+
+                bom_components = get_bom_adv(value_ranges)
                 all_components = design.allComponents
-                change_list = update_local_bom(bom_items, all_components)
+                change_list = update_local_bom_adv(bom_components[row_id], all_components, spreadsheet_id)
+
 
                 if len(change_list) != 0:
                     # change_list += 'No Metadata changes were found'
@@ -637,7 +748,6 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
 
 # Command to create a new Google Sheet or link to an existing one
 class FusionSheeterCreateCommand(Fusion360CommandBase):
-
     # Update dialog based on user selections
     def on_input_changed(self, command_, command_inputs, changed_input, input_values):
 
@@ -686,6 +796,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
             # Todo consolidate into less API calls.  Not critical
             create_sheet_bom(new_id)
+            create_sheet_bom_adv(new_id)
 
             # Todo optional only renamed features?
             create_sheet_suppression(new_id, True)
@@ -693,6 +804,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             create_sheet_display(new_id)
 
             sheets_add_protected_ranges(spreadsheet)
+
+            add_bom_part_sheet(spreadsheet, design.allComponents[:-1])
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']
@@ -772,7 +885,6 @@ class FusionSheeterOpenSheetCommand(Fusion360CommandBase):
 
 # Creates palette with sheet
 class FusionSheeterPaletteCommand(Fusion360CommandBase):
-
     def on_execute(self, command, inputs, args, input_values):
 
         app = adsk.core.Application.get()
@@ -807,9 +919,7 @@ class FusionSheeterPaletteCommand(Fusion360CommandBase):
 
 
 class FusionSheeterQuickPullCommand(Fusion360CommandBase):
-
     def on_execute(self, command, inputs, args, input_values):
-
         row_id = get_row_id()
         spreadsheet_id = get_sheet_id()
 
