@@ -136,7 +136,7 @@ def add_bom_part_sheet(spreadsheet, components):
 
     # TODO make dropdowns
     # https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#SetDataValidationRequest
-    
+
 
 # Not currently working for some reason
 def sheets_add_protected_ranges(spreadsheet):

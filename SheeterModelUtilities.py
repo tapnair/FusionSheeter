@@ -121,6 +121,55 @@ def get_features2(value_ranges):
     return list_of_lists
 
 
+# Currently only used for ADV BOM function
+def update_only_parameters(size):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+
+    design = app_objects['design']
+
+    all_parameters = design.allParameters
+
+    for parameter in all_parameters:
+
+        new_value = size.get(parameter.name)
+        if new_value is not None:
+            unit_type = parameter.unit
+
+            if len(unit_type) > 0:
+
+                if um.isValidExpression(new_value, unit_type):
+                    sheet_value = um.evaluateExpression(new_value, unit_type)
+                else:
+                    continue
+            else:
+                sheet_value = float(new_value)
+
+            # TODO handle units with an attribute that is written on create.  Can be set for link
+            if parameter.value != sheet_value:
+                parameter.value = sheet_value
+
+
+# New command not currently used, but should be
+def update_root_meta(size):
+    app_objects = get_app_objects()
+    um = app_objects['units_manager']
+
+    design = app_objects['design']
+
+    new_number = size.get('Part Number')
+    if new_number is not None:
+        design.rootComponent.partNumber = new_number
+
+    new_description = size.get('Description')
+    if new_description is not None:
+        design.rootComponent.description = new_description
+
+        # Todo create and display change list (not during size change, need variable to control)
+
+
+# Currently in use in many places
+# TODO migrate to previous two commands
 def update_local_parameters(size):
     app_objects = get_app_objects()
     um = app_objects['units_manager']

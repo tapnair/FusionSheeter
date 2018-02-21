@@ -1,6 +1,6 @@
 
 from collections import defaultdict, namedtuple
-from .SheeterModelUtilities import find_range
+from .SheeterModelUtilities import find_range, update_only_parameters
 from .SheetsService import sheets_get_range
 
 BOM_Item = namedtuple('BOM_Item', ('part_number', 'part_name', 'description', 'children', 'level'))
@@ -121,9 +121,11 @@ def update_local_bom_adv(selected_components, all_components, spreadsheet_id):
 
                 component_configs = get_bom_adv_component(component.name, spreadsheet_id)
 
+                # Config is row zipped from components sheet
                 for config in component_configs:
                     if config['Part Number'] == component.partNumber:
                         component.description = config['Description']
                         # TODO add something here to also read any parameters
+                        update_only_parameters(config)
 
     return change_list
