@@ -63,6 +63,7 @@ def sheets_create(name):
             },
             {
                 "properties": {
+                    "sheetId": 4,
                     "title": 'BOM-ADV',
                     'gridProperties': {
                         "frozenRowCount": 1
@@ -79,13 +80,19 @@ def sheets_create(name):
     return spreadsheet_response
 
 
-def add_bom_part_sheet(spreadsheet, components):
+def add_bom_part_sheet(spreadsheet, components: adsk.fusion.ComponentList):
     service = get_sheets_service()
 
     requests = []
     data = []
+    validation_data = []
+    component_number = 0
 
     for component in components:
+        # get_app_objects()['ui'].messageBox(get_app_objects()['root_comp'].name + '\n' + component.name)
+        if component.name == get_app_objects()['root_comp'].name:
+            continue
+
         component_sheet = {
             "addSheet": {
                 "properties": {
@@ -114,8 +121,38 @@ def add_bom_part_sheet(spreadsheet, components):
             "values": [headers, dims]
         }
 
+        validation_range_body = {
+            "setDataValidation": {
+                "range": {
+                    "sheetId": 4,
+                    "startRowIndex": 1,
+                    "endRowIndex": 2,
+                    "startColumnIndex": 2 + component_number,
+                    # "startColumnIndex": 2,
+                    "endColumnIndex": 3 + component_number
+                    # "endColumnIndex": 3
+                },
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_RANGE",
+                        "values": [
+                            {
+                                "userEnteredValue": '=\'BOM-' + component.name + '\'!B2:B1000'
+                            }
+                        ]
+                    },
+                    "inputMessage": "Pick from the list",
+                    "strict": False,
+                    "showCustomUi": True
+                },
+            }
+        }
+
         # TODO add some dims somehow?
         data.append(range_body)
+        validation_data.append(validation_range_body)
+
+        component_number += 1
 
     # Create the component sheets
     create_component_sheets_body = {
@@ -133,6 +170,15 @@ def add_bom_part_sheet(spreadsheet, components):
     }
     response = service.spreadsheets().values().batchUpdate(spreadsheetId=spreadsheet['spreadsheetId'],
                                                            body=batch_update_values_request_body).execute()
+
+    # Add the values to the component sheets
+    batch_update_validation_request_body = {
+        # How the input data should be interpreted.
+        'requests': validation_data
+
+    }
+    response = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet['spreadsheetId'],
+                                                  body=batch_update_validation_request_body).execute()
 
     # TODO make dropdowns
     # https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#SetDataValidationRequest
@@ -407,9 +453,11 @@ def create_sheet_bom_adv(sheet_id):
     dims.append('=Parameters!A2')
     dims.append('=Parameters!B2')
 
-    for component in design.allComponents[:-1]:
+    for component in design.allComponents:
+        if component.name == get_app_objects()['root_comp'].name:
+            continue
         headers.append(component.name)
-        dims.append(str(component.partNumber))
+        dims.append(str(component.description))
 
     values = [headers, dims]
 
@@ -724,7 +772,6 @@ class FusionSheeterSyncCommand(Fusion360CommandBase):
                 all_components = design.allComponents
                 change_list = update_local_bom_adv(bom_components[row_id], all_components, spreadsheet_id)
 
-
                 if len(change_list) != 0:
                     # change_list += 'No Metadata changes were found'
                     ui.messageBox(change_list)
@@ -805,7 +852,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
 
             sheets_add_protected_ranges(spreadsheet)
 
-            add_bom_part_sheet(spreadsheet, design.allComponents[:-1])
+            # add_bom_part_sheet(spreadsheet, design.allComponents[:-1])
+            add_bom_part_sheet(spreadsheet, design.allComponents)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']
