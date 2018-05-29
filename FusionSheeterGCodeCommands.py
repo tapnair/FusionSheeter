@@ -86,6 +86,22 @@ def gcode_regen_tool_paths(operation_collection_):
             break
 
 
+def check_valid_container(container):
+
+    valid = False
+
+    if container.objectType == adsk.cam.Operation.classType():
+        if container.operationState == adsk.cam.OperationStates.IsValidOperationState:
+            valid = True
+
+    elif container.objectType == adsk.cam.Setup.classType() or container.objectType == adsk.cam.CAMFolder.classType():
+        for operation in container.allOperations:
+            if operation.operationState == adsk.cam.OperationStates.IsValidOperationState:
+                valid = True
+
+    return valid
+
+
 def build_op_collection(operation_list_):
     # TODO use app objects, probably need to switch workspaces?
     app = adsk.core.Application.get()
@@ -156,6 +172,10 @@ class FusionSheeterGCodeCommand(Fusion360CommandBase):
         gcode_add_operations(input_values['setups'], operation_list)
         gcode_add_operations(input_values['folders'], operation_list)
         gcode_add_operations(input_values['operations'], operation_list)
+
+        # Debug testing
+        # ao = get_app_objects()
+        # ao['ui'].messageBox(str(operation_list))
 
         operation_collection = build_op_collection(operation_list)
 
@@ -256,7 +276,10 @@ class FusionSheeterGCodeCommand2(Fusion360CommandBase):
         gcode_regen_tool_paths(operation_collection)
 
         for operation in operation_collection:
-            g_code_post_operation(operation, post_name, output_folder, prefix)
+
+            # check if operation is valid
+            if check_valid_container(operation):
+                g_code_post_operation(operation, post_name, output_folder, prefix)
 
         switch_workspace('FusionSolidEnvironment')
 
