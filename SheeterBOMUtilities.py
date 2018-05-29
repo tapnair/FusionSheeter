@@ -102,6 +102,8 @@ def update_local_bom(items, all_components):
                 component.description = item['Description']
                 change_list += ('Changed: ' + component.name + ' Description to: ' + item['Description'] + '\n')
 
+        # TODO add system for custom properties
+
     return change_list
 
 

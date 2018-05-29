@@ -80,7 +80,7 @@ def sheets_create(name):
     return spreadsheet_response
 
 
-def add_bom_part_sheet(spreadsheet, components: adsk.fusion.ComponentList):
+def create_sheet_bom_parts(spreadsheet, components: adsk.fusion.ComponentList):
     service = get_sheets_service()
 
     requests = []
@@ -853,7 +853,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             sheets_add_protected_ranges(spreadsheet)
 
             # add_bom_part_sheet(spreadsheet, design.allComponents[:-1])
-            add_bom_part_sheet(spreadsheet, design.allComponents)
+            create_sheet_bom_parts(spreadsheet, design.allComponents)
 
         elif input_values['new_or_existing'] == 'Link to Existing Sheet':
             new_id = input_values['existing_sheet_id']

@@ -146,6 +146,7 @@ def update_only_parameters(size):
                 sheet_value = float(new_value)
 
             # TODO handle units with an attribute that is written on create.  Can be set for link
+            # TODO change list
             if parameter.value != sheet_value:
                 parameter.value = sheet_value
 
