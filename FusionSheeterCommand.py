@@ -178,7 +178,9 @@ def create_sheet_parameters(sheet_id, all_params):
     um = app_objects['units_manager']
     design = app_objects['design']
 
-    if all_params:
+    if design.designType == adsk.fusion.DesignTypes.DirectDesignType:
+        parameters = []
+    elif all_params:
         parameters = design.allParameters
     else:
         parameters = design.userParameters
@@ -224,24 +226,26 @@ def create_sheet_suppression(sheet_id, all_features):
     dims.append('=Parameters!A2')
     dims.append('=Parameters!B2')
 
-    # Record feature suppression state
-    time_line = design.timeline
+    if design.designType == adsk.fusion.DesignTypes.ParametricDesignType:
 
-    for index in range(time_line.count):
+        # Record feature suppression state
+        time_line = design.timeline
 
-        time_line_object = time_line.item(index)
+        for index in range(time_line.count):
 
-        if time_line_object.isGroup:
-            state = 'Group'
-        elif time_line_object.isSuppressed:
-            state = 'Suppressed'
-        else:
-            state = 'Unsuppressed'
+            time_line_object = time_line.item(index)
 
-        feature_name = get_time_line_object_name(time_line_object)
+            if time_line_object.isGroup:
+                state = 'Group'
+            elif time_line_object.isSuppressed:
+                state = 'Suppressed'
+            else:
+                state = 'Unsuppressed'
 
-        headers.append(feature_name)
-        dims.append(state)
+            feature_name = get_time_line_object_name(time_line_object)
+
+            headers.append(feature_name)
+            dims.append(state)
 
     values = [headers, dims]
 

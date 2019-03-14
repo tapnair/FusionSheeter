@@ -1,4 +1,9 @@
 
+import adsk.core
+import adsk.fusion
+import adsk.cam
+import traceback
+
 from .Fusion360Utilities.Fusion360Utilities import get_app_objects
 from .SheetsService import sheets_update_values
 
@@ -127,26 +132,28 @@ def update_local_parameters(size):
 
     design = app_objects['design']
 
-    all_parameters = design.allParameters
+    if design.designType == adsk.fusion.DesignTypes.ParametricDesignType:
 
-    for parameter in all_parameters:
+        all_parameters = design.allParameters
 
-        new_value = size.get(parameter.name)
-        if new_value is not None:
-            unit_type = parameter.unit
+        for parameter in all_parameters:
 
-            if len(unit_type) > 0:
+            new_value = size.get(parameter.name)
+            if new_value is not None:
+                unit_type = parameter.unit
 
-                if um.isValidExpression(new_value, unit_type):
-                    sheet_value = um.evaluateExpression(new_value, unit_type)
+                if len(unit_type) > 0:
+
+                    if um.isValidExpression(new_value, unit_type):
+                        sheet_value = um.evaluateExpression(new_value, unit_type)
+                    else:
+                        continue
                 else:
-                    continue
-            else:
-                sheet_value = float(new_value)
+                    sheet_value = float(new_value)
 
-            # TODO handle units with an attribute that is written on create.  Can be set for link
-            if parameter.value != sheet_value:
-                parameter.value = sheet_value
+                # TODO handle units with an attribute that is written on create.  Can be set for link
+                if parameter.value != sheet_value:
+                    parameter.value = sheet_value
 
     new_number = size.get('Part Number')
     if new_number is not None:
@@ -164,31 +171,32 @@ def update_local_features(feature_list_input):
     app_objects = get_app_objects()
     design = app_objects['design']
 
-    # Record feature suppression state
-    time_line = design.timeline
+    if design.designType == adsk.fusion.DesignTypes.ParametricDesignType:
+        # Record feature suppression state
+        time_line = design.timeline
 
-    # Going to iterate time line in reverse
-    reverse_feature_list = list(reversed(feature_list_input))
+        # Going to iterate time line in reverse
+        reverse_feature_list = list(reversed(feature_list_input))
 
-    # Walk time line in reverse order
-    for index in reversed(range(time_line.count)):
+        # Walk time line in reverse order
+        for index in reversed(range(time_line.count)):
 
-        time_line_object = time_line.item(index)
+            time_line_object = time_line.item(index)
 
-        feature_name = get_time_line_object_name(time_line_object)
+            feature_name = get_time_line_object_name(time_line_object)
 
-        new_state = find_list_item(reverse_feature_list, feature_name)
+            new_state = find_list_item(reverse_feature_list, feature_name)
 
-        # Set suppression state from sheet if different than current
-        if new_state is not None:
+            # Set suppression state from sheet if different than current
+            if new_state is not None:
 
-            if new_state[1] == 'Unsuppressed' and time_line_object.isSuppressed:
-                time_line_object.isSuppressed = False
+                if new_state[1] == 'Unsuppressed' and time_line_object.isSuppressed:
+                    time_line_object.isSuppressed = False
 
-            elif new_state[1] == 'Suppressed' and not time_line_object.isSuppressed:
-                time_line_object.isSuppressed = True
+                elif new_state[1] == 'Suppressed' and not time_line_object.isSuppressed:
+                    time_line_object.isSuppressed = True
 
-    # Todo create and display change list (not during size change, need variable to control)
+        # Todo create and display change list (not during size change, need variable to control)
 
 
 # Search sheets feature list for item pops it from list
