@@ -313,8 +313,6 @@ def create_sheet_bom(sheet_id):
     sheets_update_values(sheet_id, sheet_range, range_body)
 
 
-
-
 # Create a dropdown based on descriptions on Parameters page
 def build_sizes_dropdown(command_inputs, value_ranges):
 
@@ -326,7 +324,9 @@ def build_sizes_dropdown(command_inputs, value_ranges):
                                                             adsk.core.DropDownStyles.LabeledIconDropDownStyle)
 
     for size in parameters:
-        size_drop_down.listItems.add(size['Description'], False)
+        label = size.get('Description')
+        if label is not None:
+            size_drop_down.listItems.add(label, False)
 
     row_id = get_row_id()
 
