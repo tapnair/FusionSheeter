@@ -38,6 +38,34 @@ def push_parameters(parameter_matrix, row_id, spreadsheet_id, all_params=False):
     sheets_update_values(spreadsheet_id, sheet_range, range_body)
 
 
+def update_custom_properties(property_matrix, row_index, custom_properties):
+
+    for name, value in custom_properties.items():
+
+        try:
+            index = property_matrix[0].index(name)
+
+        except ValueError:
+            property_matrix[0].append(name)
+            index = len(property_matrix[0])-1
+
+        try:
+            property_matrix[row_index][index] = value
+
+        except IndexError:
+            property_matrix[row_index].append(value)
+
+
+def push_properties(property_matrix, spreadsheet_id):
+
+    range_body = {"range": "Custom Properties",
+                  "values": property_matrix}
+
+    sheet_range = 'Custom Properties'
+
+    sheets_update_values(spreadsheet_id, sheet_range, range_body)
+
+
 def push_display(display_matrix, row_id, spreadsheet_id):
 
     app_objects = get_app_objects()
@@ -104,6 +132,13 @@ def get_parameters_matrix(value_ranges):
     parameter_matrix = find_range(value_ranges, 'Parameters')
 
     return parameter_matrix
+
+
+def get_properties_matrix(value_ranges):
+
+    properties_matrix = find_range(value_ranges, 'Custom Properties')
+
+    return properties_matrix
 
 
 def get_display_matrix(value_ranges):

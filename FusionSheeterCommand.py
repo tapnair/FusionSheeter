@@ -60,6 +60,14 @@ def sheets_create(name):
                         "frozenRowCount": 1
                     }
                 }
+            },
+            {
+                "properties": {
+                    "title": 'Custom Properties',
+                    'gridProperties': {
+                        "frozenRowCount": 1
+                    }
+                }
             }
         ]
     }
@@ -161,6 +169,22 @@ def sheets_add_protected_ranges(spreadsheet):
 
                 }
             }
+        },
+        {
+            "addProtectedRange": {
+                'protectedRange': {
+                    "range": {
+                        "sheetId": sheet_ids['Custom Properties'],
+                        "startRowIndex": 0,
+                        "endRowIndex": 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 2
+                    },
+                    "description": "Headers must match Component names in Fusion 360",
+                    "warningOnly": True
+
+                }
+            }
         }
 
     ]
@@ -206,6 +230,37 @@ def create_sheet_parameters(sheet_id, all_params):
                   "values": [headers, dims]}
 
     sheet_range = 'Parameters'
+
+    sheets_update_values(sheet_id, sheet_range, range_body)
+
+
+# Create Parameters Sheet
+def create_sheet_properties(sheet_id):
+    app_objects = get_app_objects()
+    design = app_objects['design']
+
+    headers = []
+    dims = []
+
+    # TODO implement specifically for builder?
+    # headers.append('name')
+    # dims.append(design.rootComponent.name)
+
+    headers.append('Part Number')
+    dims.append(design.rootComponent.partNumber)
+
+    headers.append('Description')
+    dims.append(design.rootComponent.description)
+
+    # Todo add some properties like material?
+    # for parameter in parameters:
+    #     headers.append(parameter.name)
+    #     dims.append(um.formatInternalValue(parameter.value, parameter.unit, False))
+
+    range_body = {"range": "Custom Properties",
+                  "values": [headers, dims]}
+
+    sheet_range = 'Custom Properties'
 
     sheets_update_values(sheet_id, sheet_range, range_body)
 
@@ -695,6 +750,8 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             create_sheet_suppression(new_id, True)
 
             create_sheet_display(new_id)
+
+            create_sheet_properties(new_id)
 
             sheets_add_protected_ranges(spreadsheet)
 
