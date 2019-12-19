@@ -12,6 +12,7 @@ from .SheeterModelUtilities import get_parameters2, get_features2, update_local_
 
 name_index_map = {}
 
+
 def export_active_doc(folder, file_types, write_version, index):
     app = adsk.core.Application.get()
     design = app.activeProduct
