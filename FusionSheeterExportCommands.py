@@ -13,6 +13,20 @@ from .SheeterModelUtilities import get_parameters2, get_features2, update_local_
 name_index_map = {}
 
 
+def get_export_name(folder, write_version, index, export_extension):
+
+    app = adsk.core.Application.get()
+    doc_name = app.activeDocument.name
+
+    if not write_version:
+        doc_name = doc_name[:doc_name.rfind(' v')]
+
+    export_name = folder + doc_name + '_' + str(index) + export_extension
+    export_name = dup_check(export_name)
+
+    return export_name
+
+
 def export_active_doc(folder, file_types, write_version, index):
     app = adsk.core.Application.get()
     design = app.activeProduct
@@ -23,22 +37,20 @@ def export_active_doc(folder, file_types, write_version, index):
                         export_mgr.createSATExportOptions,
                         export_mgr.createSMTExportOptions,
                         export_mgr.createFusionArchiveExportOptions,
-                        export_mgr.createSTLExportOptions]
-    export_extensions = ['.igs', '.step', '.sat', '.smt', '.f3d', '.stl']
+                        ]
+    export_extensions = ['.igs', '.step', '.sat', '.smt', '.f3d']
 
-    for i in range(file_types.count):
+    for i in range(file_types.count - 1):
 
         if file_types.item(i).isSelected:
-
-            doc_name = app.activeDocument.name
-
-            if not write_version:
-                doc_name = doc_name[:doc_name.rfind(' v')]
-
-            export_name = folder + doc_name + '_' + str(index) + export_extensions[i]
-            export_name = dup_check(export_name)
+            export_name = get_export_name(folder, write_version, index, export_extensions[i])
             export_options = export_functions[i](export_name)
             export_mgr.execute(export_options)
+
+    if file_types.item(file_types.count-1).isSelected:
+        stl_export_name = get_export_name(folder, write_version, index, '.stl')
+        stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
+        export_mgr.execute(stl_options)
 
 
 def dup_check(name):
@@ -168,7 +180,7 @@ class FusionSheeterExportCommand(Fusion360CommandBase):
         drop_input_list.add('SAT', False)
         drop_input_list.add('SMT', False)
         drop_input_list.add('F3D', False)
-        # drop_input_list.add('STL', False)
+        drop_input_list.add('STL', False)
 
         command_inputs.addBoolValueInput('write_version', 'Write versions to output file names?', True)
 
