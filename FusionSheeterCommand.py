@@ -17,6 +17,14 @@ import webbrowser
 
 from collections import defaultdict
 
+from enum import Enum
+
+
+class DocumentParameters(Enum):
+    ALL = 1
+    USER = 2
+    FAVORITES = 3
+
 
 # Create new Google Sheet
 def sheets_create(name):
@@ -173,17 +181,24 @@ def sheets_add_protected_ranges(spreadsheet):
 
 
 # Create Parameters Sheet
-def create_sheet_parameters(sheet_id, all_params):
+def create_sheet_parameters(sheet_id, parameter_choice):
     app_objects = get_app_objects()
     um = app_objects['units_manager']
     design = app_objects['design']
 
+    parameters = []
+
     if design.designType == adsk.fusion.DesignTypes.DirectDesignType:
-        parameters = []
-    elif all_params:
+        app_objects['ui'].messageBox('Note this model is a direct design and has no parameters')
+
+    elif parameter_choice == DocumentParameters.ALL:
         parameters = design.allParameters
-    else:
+    elif parameter_choice == DocumentParameters.USER:
         parameters = design.userParameters
+    elif parameter_choice == DocumentParameters.FAVORITES:
+        for parameter in design.allParameters:
+            if parameter.isFavorite:
+                parameters.append(parameter)
 
     headers = []
     dims = []
@@ -673,10 +688,16 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         design = app_objects['design']
         ui = app_objects['ui']
 
-        all_params = True
+        # all_params = True
 
-        if input_values['parameters_option'] == 'User Parameters Only':
-            all_params = False
+        if input_values['parameters_option'] == 'All Parameters':
+            parameter_choice = DocumentParameters.ALL
+        elif input_values['parameters_option'] == 'User Parameters Only':
+            parameter_choice = DocumentParameters.USER
+        elif input_values['parameters_option'] == 'Favorite Parameters Only':
+            parameter_choice = DocumentParameters.FAVORITES
+        else:
+            raise ValueError
 
         name = app_objects['app'].activeDocument.name
         name = name[:name.rfind(' v')]
@@ -685,7 +706,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
             spreadsheet = sheets_create(name)
             new_id = spreadsheet['spreadsheetId']
 
-            create_sheet_parameters(new_id, all_params)
+            create_sheet_parameters(new_id, parameter_choice)
             design.attributes.add('FusionSheeter', 'parameter_row_index', str(0))
 
             # Todo consolidate into less API calls.  Not critical
@@ -705,7 +726,7 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         else:
             new_id = ''
             ui.messageBox('Something went wrong creating sheet with your inputs')
-            return
+            raise ValueError
 
         design.attributes.add('FusionSheeter', 'spreadsheetId', new_id)
         design.attributes.add('FusionSheeter', 'parameter_row_index', '0')
@@ -752,8 +773,10 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
         param_title.isVisible = True
 
         parameters_option_group = command_inputs.addRadioButtonGroupCommandInput('parameters_option')
-        parameters_option_group.listItems.add('All Parameters', False, './resources')
+        parameters_option_group.listItems.add('All Parameters', False)
+        # parameters_option_group.listItems.add('All Parameters', False, './resources')
         parameters_option_group.listItems.add('User Parameters Only', True)
+        parameters_option_group.listItems.add('Favorite Parameters Only', False)
         parameters_option_group.isVisible = True
 
         warning_text = '<br> <b>Warning! </b><br><br>' \
