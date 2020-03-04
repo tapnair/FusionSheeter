@@ -8,7 +8,7 @@ NOTE: This sample is provided "As-is" with no guarantee of performance, reliabil
 
 
 # Installation
-[Click here to download the Add-in](https://github.com/tapnair/FusionSheeter/archive/master.zip)
+Download the add-in. 
 
 
 After downloading the zip file follow the [installation instructions here](https://tapnair.github.io/installation.html) for your particular OS version of Fusion 360
