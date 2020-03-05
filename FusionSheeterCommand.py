@@ -668,7 +668,6 @@ class FusionSheeterCreateCommand(Fusion360CommandBase):
                 command_inputs.itemById('param_title').isVisible = True
                 input_values['parameters_option_input'].isVisible = True
 
-
             elif changed_input.selectedItem.name == 'Link to Existing Sheet':
                 input_values['instructions_input'].isVisible = True
                 input_values['existing_sheet_id_input'].isVisible = True
