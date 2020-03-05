@@ -17,22 +17,28 @@ def export_active_doc(folder, file_types, write_version, output_name):
     design = app.activeProduct
     export_mgr = design.exportManager
 
-    export_functions = [export_mgr.createIGESExportOptions,
-                        export_mgr.createSTEPExportOptions,
-                        export_mgr.createSATExportOptions,
-                        export_mgr.createSMTExportOptions,
-                        export_mgr.createFusionArchiveExportOptions,
-                        export_mgr.createSTLExportOptions]
+    export_functions = [
+        export_mgr.createIGESExportOptions,
+        export_mgr.createSTEPExportOptions,
+        export_mgr.createSATExportOptions,
+        export_mgr.createSMTExportOptions,
+        export_mgr.createFusionArchiveExportOptions,
+        export_mgr.createSTLExportOptions
+    ]
     export_extensions = ['.igs', '.step', '.sat', '.smt', '.f3d', '.stl']
 
-    for i in range(file_types.count):
+    for i in range(file_types.count-1):
 
         if file_types.item(i).isSelected:
-
             export_name = folder + output_name + export_extensions[i]
             export_name = dup_check(export_name)
             export_options = export_functions[i](export_name)
             export_mgr.execute(export_options)
+
+    if file_types.item(file_types.count - 1).isSelected:
+        stl_export_name = folder + output_name + '.stl'
+        stl_options = export_mgr.createSTLExportOptions(design.rootComponent, stl_export_name)
+        export_mgr.execute(stl_options)
 
 
 def dup_check(name):
@@ -73,10 +79,11 @@ def get_name(write_version, index, size, option, column_name):
         raise ValueError('Something strange happened')
 
     if output_name is None:
-        raise AttributeError('There is no column in the sheet with the name {}.  Aborting operation.'.format(column_name))
+        raise AttributeError(
+            'There is no column in the sheet with the name {}.  Aborting operation.'.format(column_name))
 
     elif output_name.isspace() or (len(output_name) < 1):
-        raise ValueError('Skipping row {} as there is no value for the column {}.'.format(column_name, index+2))
+        raise ValueError('Skipping row {} as there is no value for the column {}.'.format(column_name, index + 2))
 
     else:
         return output_name
@@ -107,7 +114,6 @@ def add_name_inputs(command_inputs):
 
 
 def update_name_inputs(command_inputs, selection):
-
     command_inputs.itemById('column_name_id').isVisible = False
     command_inputs.itemById('name_warning_id').isVisible = False
     command_inputs.itemById('write_version').isVisible = False
@@ -243,7 +249,7 @@ class FusionSheeterExportCommand(Fusion360CommandBase):
         drop_input_list.add('SAT', False)
         drop_input_list.add('SMT', False)
         drop_input_list.add('F3D', False)
-        # drop_input_list.add('STL', False)
+        drop_input_list.add('STL', False)
 
         add_name_inputs(command_inputs)
         update_name_inputs(command_inputs, 'Document Name')
