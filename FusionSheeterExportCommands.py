@@ -201,7 +201,10 @@ class FusionSheeterExportCommand(Fusion360CommandBase):
         ui = app_objects['ui']
 
         folder = input_values['output_folder']
-        file_types = input_values['file_types_input'].listItems
+
+        # TODO broken?????
+        file_types = inputs.itemById('file_types_input').listItems
+
         write_version = input_values['write_version']
         name_option = input_values['name_option_id']
         column_name = input_values['column_name_id']
