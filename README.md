@@ -1,4 +1,16 @@
-# FusionSheeter
+# Archived - FusionSheeter
+
+# Important Notice:
+**Due to a number of factors including updates to Google Security Policy, this has been "migrated."
+
+[You can find the new download here](https://n3rdlab.com/downloads/sheeter/)
+
+I am still working on a few things and then will probably make the "new" source available as well.  
+
+Also looking to make some "installers" and a few other upgrades, but just getting to this point has been A TON of work.  
+
+
+# For posterity:
 
 Connect a Fusion 360 design to Google Sheets
 
